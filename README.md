@@ -1,3 +1,4 @@
+# DISCLAIMER - THIS APP IS ENTIRELY VIBE CODED - I DID NOT INTEND FOR LOOKS/MOST FEATURES.
 # Aero-Dynamics — Create Aeronautics Ship & Shape Studio
 
 A fast, self-contained studio for Create mod airships (Create Aeronautics), rebuilt around

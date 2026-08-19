@@ -1,0 +1,44 @@
+.jspace/
+instructions.txt
+node_modules/
+package-lock.json
+*.zip
+*.log
+.DS_Store
+_site/
+
+# ---- AI agent & assistant tooling ----
+# workspace ledgers, sessions and agent scratch dirs
+.jspace/
+.agents/
+.prime/
+.agent/
+.agent-work/
+.sessions/
+session-artifacts/
+# Claude / Anthropic
+.claude/
+.claude.json
+CLAUDE.md
+# Cursor / Windsurf / Continue / Roo / Codex / OpenHands / Aider
+.cursor/
+.cursorrules
+.cursorrules.txt
+.windsurf/
+.continue/
+.roo/
+.rooignore
+.codex/
+.openhands/
+.aider*
+.opencode/
+.qwen/
+.gemini/
+.amazonq/
+# OpenAI / Copilot instruction files
+AGENTS.md
+.copilot-instructions.md
+.github/copilot-instructions.md
+# speculative-agent leftovers
+*.session.jsonl
+*.agent.json

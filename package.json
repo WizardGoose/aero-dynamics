@@ -1,0 +1,13 @@
+{
+  "name": "aero-dynamics",
+  "private": true,
+  "version": "2.1.0",
+  "description": "Aero-Dynamics \u2014 Create Aeronautics ship & shape studio: balloon, propeller, wings, rhombus crystal shard ships, shape primitives and a schematic audit lab.",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "build": "node scripts/build.js"
+  },
+  "dependencies": {
+    "playwright": "^1.62.1"
+  }
+}

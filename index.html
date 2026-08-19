@@ -1,0 +1,2762 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='42' r='30' fill='%23ffb347'/><rect x='44' y='66' width='12' height='14' fill='%23d8dcdc'/><path d='M34 82 L50 66 L66 82' fill='none' stroke='%23d8dcdc' stroke-width='4'/></svg>">
+<title>Aero-Dynamics — Create Aeronautics Ship &amp; Shape Studio</title>
+<style>  :root {
+    color-scheme: dark;
+    --bg: #0b0c0f;
+    --glass: rgba(28, 30, 34, .66);
+    --glass2: rgba(38, 41, 46, .8);
+    --line: rgba(255, 255, 255, .08);
+    --line2: rgba(255, 255, 255, .14);
+    --txt: #f5f5f7; --dim: #8e8e93; --faint: #636366;
+    --acc: #0a84ff; --acc-soft: rgba(10, 132, 255, .14);
+    --ok: #30d158; --ok-soft: rgba(48, 209, 88, .14);
+    --bad: #ff453a; --bad-soft: rgba(255, 69, 58, .14);
+    --rad: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--txt);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: .01em;
+    display: flex; flex-direction: column; overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: rgba(10, 132, 255, .35); }
+  header {
+    display: flex; align-items: center; gap: 14px; padding: 10px 16px;
+    background: var(--glass); backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    border-bottom: 1px solid var(--line); flex: 0 0 auto; z-index: 10;
+  }
+  header h1 { font-size: 15px; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; }
+  nav.tabs {
+    display: flex; gap: 2px; background: rgba(118, 118, 128, .16);
+    border-radius: 9px; padding: 2px;
+  }
+  nav.tabs button {
+    background: transparent; color: var(--txt); border: none;
+    padding: 4px 12px; border-radius: 7px; cursor: pointer; font-size: 13px;
+    font-weight: 500; letter-spacing: .01em; transition: background .18s ease, color .18s ease;
+  }
+  nav.tabs button:hover { background: rgba(255, 255, 255, .08); }
+  nav.tabs button.active { background: #f2f2f4; color: #0b0c0f; font-weight: 600; }
+  nav.tabs a.hbtn { margin-left: 2px; }
+  .spacer { flex: 1; }
+  .hbtn {
+    background: rgba(255, 255, 255, .06); color: var(--txt);
+    border: 1px solid var(--line2); padding: 5px 13px; border-radius: 8px;
+    cursor: pointer; font-size: 13px; font-weight: 500; white-space: nowrap;
+    transition: background .18s ease, border-color .18s ease;
+  }
+  .hbtn:hover { background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .24); }
+  .hbtn.primary { background: var(--acc); border-color: transparent; color: #fff; }
+  .hbtn.primary:hover { background: #2993ff; }
+  .chk { display: flex; align-items: center; gap: 7px; color: var(--dim); font-size: 13px; cursor: pointer; }
+  .chk input[type=checkbox], .sw input[type=checkbox] {
+    -webkit-appearance: none; appearance: none;
+    width: 16px; height: 16px; flex: 0 0 auto; margin: 0;
+    border-radius: 5px; border: 1px solid rgba(255, 255, 255, .22); background: rgba(255, 255, 255, .04);
+    cursor: pointer; position: relative; vertical-align: middle; transition: all .18s ease;
+  }
+  .chk input[type=checkbox]:hover, .sw input[type=checkbox]:hover { border-color: rgba(255, 255, 255, .4); }
+  .chk input[type=checkbox]:checked, .sw input[type=checkbox]:checked { background: var(--acc); border-color: var(--acc); }
+  .chk input[type=checkbox]:checked::after, .sw input[type=checkbox]:checked::after {
+    content: ''; position: absolute; left: 4px; top: 1px;
+    width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+  }
+  main { flex: 1; display: flex; min-height: 0; padding: 14px; gap: 14px; }
+  aside {
+    width: 296px; flex: 0 0 auto;
+    background: var(--glass); backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    border: 1px solid var(--line); border-radius: var(--rad);
+    overflow-y: auto; padding: 14px 14px 18px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .4);
+  }
+  #viewport {
+    flex: 1; position: relative; min-width: 0; touch-action: none;
+    background: #0e1013; border-radius: var(--rad); overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  .presets { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 14px; }
+  .presets button {
+    background: rgba(255, 255, 255, .05); color: var(--dim);
+    border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px;
+    font-size: 11.5px; cursor: pointer; transition: all .18s ease;
+  }
+  .presets button:hover { color: var(--txt); border-color: var(--line2); background: rgba(255, 255, 255, .08); }
+  .presets button.exact { border-color: rgba(48, 209, 88, .35); color: var(--ok); }
+  .grp { margin-bottom: 12px; }
+  .grp label.lbl { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--dim); margin-bottom: 3px; letter-spacing: .02em; }
+  .grp label.lbl b { color: var(--txt); font-weight: 550; font-variant-numeric: tabular-nums; }
+  input[type=range] {
+    width: 100%; height: 20px; margin: 0; display: block;
+    -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track { height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .16); }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 15px; height: 15px; margin-top: -6px; border-radius: 50%;
+    background: #fff; border: none; box-shadow: 0 1px 4px rgba(0, 0, 0, .5);
+    transition: transform .15s ease;
+  }
+  input[type=range]:active::-webkit-slider-thumb { transform: scale(1.15); }
+  input[type=range]::-moz-range-track { height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .16); }
+  input[type=range]::-moz-range-thumb {
+    width: 13px; height: 13px; border-radius: 50%; background: #fff; border: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, .5);
+  }
+  input[type=range]:focus { outline: none; }
+  .sw { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--dim); cursor: pointer; margin-bottom: 8px; }
+  .selrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12.5px; color: var(--dim); }
+  .selrow select {
+    flex: 1; background: rgba(255, 255, 255, .06); color: var(--txt);
+    border: 1px solid var(--line2); border-radius: 8px; padding: 5px 28px 5px 10px;
+    font-size: 12.5px; color-scheme: dark; outline: none; cursor: pointer;
+    -webkit-appearance: none; -moz-appearance: none; appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%238e8e93' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat; background-position: right 10px center;
+    transition: border-color .18s ease, background-color .18s ease;
+  }
+  .selrow select:hover { border-color: rgba(255, 255, 255, .32); }
+  .selrow select:focus { border-color: var(--acc); background-color: rgba(255, 255, 255, .09); }
+  .selrow select option { background: #1c1e22; color: var(--txt); }
+  .selrow select option:checked { background: var(--acc-soft); color: #7ab8f5; }
+  /* ---- section headers ---- */
+  .ptitle {
+    margin: 16px 0 7px; font-size: 11px; font-weight: 650; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--acc);
+  }
+  .ptitle:first-of-type { margin-top: 4px; }
+  /* ---- segmented button groups ---- */
+  .segrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .segrow .seglbl { font-size: 12.5px; color: var(--dim); white-space: nowrap; }
+  .seg { display: flex; gap: 0; }
+  .seg button {
+    background: rgba(255, 255, 255, .06); color: var(--dim);
+    border: 1px solid var(--line2); padding: 4px 9px; cursor: pointer;
+    font-size: 12px; white-space: nowrap; transition: all .15s ease;
+  }
+  .seg button:first-child { border-radius: 7px 0 0 7px; }
+  .seg button:last-child { border-radius: 0 7px 7px 0; }
+  .seg button:only-child { border-radius: 7px; }
+  .seg button + button { margin-left: -1px; }
+  .seg button:hover { color: var(--txt); background: rgba(255, 255, 255, .1); }
+  .seg button.active { background: var(--acc); border-color: var(--acc); color: #fff; font-weight: 600; }
+  /* ---- color / wood swatches ---- */
+  .swatchrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .swatchrow .seglbl { font-size: 12.5px; color: var(--dim); white-space: nowrap; }
+  .swatches { display: flex; gap: 3px; flex-wrap: wrap; max-width: 152px; justify-content: flex-end; }
+  .swatches button {
+    width: 18px; height: 18px; border-radius: 5px; border: 1px solid var(--line2);
+    cursor: pointer; padding: 0; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .25);
+  }
+  .swatches button:hover { transform: scale(1.12); }
+  .swatches button.active { outline: 2px solid var(--acc); outline-offset: 1px; }
+  /* ---- seed row + number boxes ---- */
+  .seedrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .seedrow .seglbl { font-size: 12.5px; color: var(--dim); white-space: nowrap; }
+  .seedrow .inputs { display: flex; gap: 4px; }
+  input[type=number] {
+    width: 62px; background: rgba(255, 255, 255, .06); color: var(--txt);
+    border: 1px solid var(--line2); border-radius: 8px; padding: 4px 6px;
+    font-size: 12.5px; color-scheme: dark; outline: none; font-variant-numeric: tabular-nums;
+  }
+  input[type=number]:focus { border-color: var(--acc); }
+  .grp .row { display: flex; align-items: center; gap: 8px; }
+  .grp .row input[type=range] { flex: 1; }
+  .grp input[type=number] { width: 58px; flex: 0 0 auto; }
+  .dice {
+    background: rgba(255, 255, 255, .06); border: 1px solid var(--line2); border-radius: 8px;
+    cursor: pointer; font-size: 14px; padding: 3px 8px; transition: all .15s ease;
+  }
+  .dice:hover { background: rgba(255, 255, 255, .12); transform: rotate(15deg); }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .14); border-radius: 5px; border: 2px solid transparent; background-clip: content-box; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, .26); background-clip: content-box; }
+  .hidden { display: none !important; }
+  footer.stats {
+    display: flex; align-items: center; gap: 14px; padding: 5px 14px;
+    background: var(--glass); backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    border-top: 1px solid var(--line); font-size: 12px; flex: 0 0 auto;
+    overflow-x: auto; white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  footer.stats .stat { color: var(--txt); display: flex; align-items: baseline; gap: 5px; }
+  footer.stats .stat .l {
+    color: var(--faint); font-size: 10px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .07em;
+  }
+  footer.stats .stat .v { color: var(--txt); font-weight: 550; }
+  footer.stats .badge {
+    padding: 3px 10px; border-radius: 8px; font-weight: 600; font-size: 12px;
+  }
+  footer.stats .badge.exact { background: var(--ok-soft); color: var(--ok); }
+  footer.stats .badge.miss { background: var(--bad-soft); color: var(--bad); }
+  footer.stats .badge.solid { background: rgba(255, 255, 255, .07); color: var(--dim); }
+  #req {
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px;
+    padding: 10px 18px; font-size: 13px; color: var(--dim);
+    background: rgba(255, 255, 255, .025);
+    border-top: 1px solid var(--line); flex: 0 0 auto;
+    font-variant-numeric: tabular-nums; white-space: nowrap; overflow-x: auto;
+  }
+  #req .req-title {
+    color: var(--acc); font-weight: 650; letter-spacing: .04em;
+    text-transform: uppercase; font-size: 11px; margin-right: 4px;
+  }
+  #req b { color: var(--txt); font-weight: 600; }
+  #req .req-ok { color: var(--ok); }
+  #req .req-bad { color: var(--bad); }
+  #req .com-clear { color: var(--dim); cursor: pointer; margin-left: 4px; }
+  #req .com-clear:hover { color: var(--bad); }
+  #req .req-formula { color: var(--acc); font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12px; }
+  .labdrop {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    min-height: 170px; margin: 10px 14px 16px; padding: 22px;
+    border: 1.5px dashed var(--line2); border-radius: 14px; cursor: pointer;
+    color: var(--dim); font-size: 13px; text-align: center;
+    background: rgba(255, 255, 255, .02); transition: all .18s ease;
+  }
+  .labdrop:hover, .labdrop.over { border-color: var(--acc); background: var(--acc-soft); color: var(--txt); }
+  .labdrop b { color: var(--txt); }
+  .lab-out { margin: 0 14px 16px; font-size: 12.5px; color: var(--dim); }
+  .lab-out h3 { color: var(--txt); font-size: 13.5px; margin: 12px 0 6px; }
+  .lab-out table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  .lab-out td, .lab-out th { padding: 4px 8px; text-align: left; border-bottom: 1px solid var(--line); }
+  .lab-out td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .lab-out code { background: rgba(255, 255, 255, .06); border-radius: 5px; padding: 1px 5px; font-size: 11.5px; }
+  .lab-out .warn { color: var(--bad); }
+  #subsample-note {
+    position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    background: rgba(20, 21, 24, .8); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    color: var(--dim); padding: 4px 12px; border-radius: 10px;
+    font-size: 12px; z-index: 5; pointer-events: none; border: 1px solid var(--line);
+  }
+  #controls-hint {
+    position: absolute; right: 12px; bottom: 10px; z-index: 5;
+    font-size: 11.5px; color: var(--faint); background: rgba(15, 16, 18, .6);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    padding: 3px 10px; border-radius: 8px; pointer-events: none; user-select: none;
+  }
+  #toast {
+    position: fixed; bottom: 52px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: rgba(32, 34, 38, .92); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    color: var(--txt); padding: 8px 18px; border-radius: 10px;
+    font-size: 13px; border: 1px solid var(--line2); transition: transform .25s cubic-bezier(.3, 1.4, .5, 1); z-index: 20;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+  /* ---- ponder-styled guide modal ---- */
+  #guide-modal {
+    position: fixed; inset: 0; z-index: 30; background: rgba(5, 6, 8, .72);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #guide-modal.hidden { display: none; }
+  .guide-box {
+    background: rgba(26, 28, 31, .94); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    border: 1px solid var(--line2); border-radius: 16px;
+    width: min(780px, 94vw); max-height: 92vh; overflow: auto; padding: 16px 18px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, .6);
+  }
+  .guide-text {
+    background: rgba(255, 255, 255, .05); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px 14px; margin: 2px 0 10px; min-height: 22px;
+    font-size: 13.5px; color: #e8ecec;
+  }
+  .guide-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .guide-head b { font-size: 15px; font-weight: 600; }
+  .guide-head .grow { flex: 1; }
+  .guide-head .sub { color: var(--dim); font-size: 12.5px; }
+  #guide-close {
+    background: transparent; border: none; color: var(--dim);
+    font-size: 17px; cursor: pointer; padding: 2px 6px; border-radius: 6px;
+  }
+  #guide-close:hover { color: var(--txt); background: rgba(255, 255, 255, .08); }
+  .guide-hint { font-size: 12px; color: var(--dim); margin: 4px 0 10px; }
+  .guide-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .guide-nav button {
+    background: rgba(255, 255, 255, .06); color: var(--txt);
+    border: 1px solid var(--line2); border-radius: 8px; padding: 5px 13px;
+    cursor: pointer; font-size: 12.5px; white-space: nowrap; transition: background .18s ease;
+  }
+  .guide-nav button:hover:not(:disabled) { background: rgba(255, 255, 255, .1); }
+  .guide-nav button:disabled { opacity: .35; cursor: default; }
+  .guide-nav input[type=range] { flex: 1; }
+  input[type=range]:disabled { opacity: .4; cursor: default; }
+  .guide-modes { display: flex; gap: 6px; margin-bottom: 8px; }
+  .guide-modes button {
+    background: rgba(255, 255, 255, .05); color: var(--dim);
+    border: 1px solid var(--line); border-radius: 8px; padding: 4px 12px; cursor: pointer; font-size: 12.5px;
+  }
+  .guide-modes button.active { border-color: var(--acc); color: var(--acc); background: var(--acc-soft); }
+  #guide-canvas {
+    width: 100%; height: auto; display: block;
+    background: rgba(255, 255, 255, .03); border: 1px solid var(--line); border-radius: 10px;
+  }
+  #guide-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 10px; font-size: 12.5px; color: var(--dim); }
+  #guide-legend i {
+    display: inline-block; width: 12px; height: 12px; border-radius: 3px;
+    margin-right: 5px; vertical-align: -1px;
+  }
+  #guide-layer-count { color: var(--dim); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Aero-Dynamics</h1>
+  <nav class="tabs">
+    <button id="tab-balloon" class="active" data-tab="balloon">Balloon</button>
+    <button id="tab-prop" data-tab="prop">Propeller</button>
+    <button id="tab-wings" data-tab="wings">Wings</button>
+    <button id="tab-crystal" data-tab="crystal">Crystal</button>
+    <button id="tab-shapes" data-tab="shapes">Shapes</button>
+    <button id="tab-lab" data-tab="lab">Lab</button>
+  </nav>
+  <div class="spacer"></div>
+  <a class="hbtn" href="wiki.html" style="text-decoration:none">Handbook</a>
+  <div class="spacer"></div>
+  <label class="chk"><input type="checkbox" id="spin"> Spin</label>
+  <button class="hbtn" id="fit-btn">Fit view</button>
+  <button class="hbtn" id="guide-btn">Guide</button>
+  <button class="hbtn" id="share-btn">Copy link</button>
+  <label class="chk" title="Adds a single sea-lantern block at the model's center to the .nbt / .litematic export — a visible center reference when you paste">
+    <input type="checkbox" id="cb-center"> Center block</label>
+  <button class="hbtn" id="nbt-btn" title="Litematica schematic (.litematic) — load it straight into Litematica / Forgematica">.litematic</button>
+  <button class="hbtn primary" id="dl-btn" title="Create schematic (.nbt) — gzipped structure NBT for Create's Schematicannon">⬇ .nbt</button>
+</header>
+<main>
+  <aside id="panel"></aside>
+  <div id="viewport">
+    <div id="subsample-note" class="hidden"></div>
+    <div id="controls-hint">Drag: orbit · Shift+Drag: pan · Wheel: zoom</div>
+  </div>
+</main>
+<footer class="stats" id="stats">
+  <span class="stat"><span class="l" id="lb-blocks">Blocks</span><b class="v" id="st-blocks">—</b></span>
+  <span class="stat"><span class="l" id="lb-interior">Interior</span><b class="v" id="st-interior">—</b></span>
+  <span class="stat"><span class="l" id="lb-burners">Burners</span><b class="v" id="st-burners">—</b></span>
+  <span class="stat"><span class="l" id="lb-waste">Waste</span><b class="v" id="st-waste">—</b></span>
+  <span class="stat"><span class="l" id="lb-eff">Vol/Wool</span><b class="v" id="st-eff">—</b></span>
+  <span id="st-badge"></span>
+  <span class="stat"><span class="l">Size</span><b class="v" id="st-size">—</b></span>
+  <span class="stat"><span class="l">Gen</span><b class="v" id="st-time">—</b></span>
+</footer>
+<div id="req" class="hidden"><span class="req-title">Requirements</span><span id="req-body"></span></div>
+<div id="guide-modal" class="hidden">
+  <div class="guide-box">
+    <div class="guide-head">
+      <b>Building guide</b>
+      <span class="grow"></span>
+      <span class="sub" id="guide-layer-info"></span>
+      <span class="sub" id="guide-layer-count"></span>
+      <button id="guide-close" title="Close">✕</button>
+    </div>
+    <p class="guide-hint">Layer by layer: orange = place now, dimmed = the previous layer, green = blocks that stack on it. Drag to move the view &middot; wheel to zoom &middot; scrub the slider to review.</p>
+    <div class="guide-text" id="guide-text"></div>
+    <div class="guide-hint" id="guide-stats-line"></div>
+    <div class="guide-nav">
+      <button id="guide-play">▶ Play</button>
+      <button id="guide-prev">← Previous</button>
+      <input type="range" id="guide-slider" min="0" max="0" value="0" step="1">
+      <button id="guide-next">Next →</button>
+    </div>
+    <div class="guide-modes">
+      <button id="guide-mode-layers" class="active">Steps</button>
+      <button id="guide-mode-section">Cut section</button>
+    </div>
+    <canvas id="guide-canvas" width="640" height="480"></canvas>
+    <div id="guide-legend"></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="three.min.js"></script>
+<script>
+'use strict';
+/* ================= constants ================= */
+var WOOL = 7, LOG = 8, SAIL = 9, PLANK = 1;
+var WING = 12;                       /* copycat wing blocks (Create Propulsion: Simulated) */
+/* crystal shard ships */
+var CRYSTAL = 20, INCLUSION = 21, AIRBURNER = 22, PROPBEARING = 23,
+    PROPELLER = 24, STEERWHEEL = 25, THROTTLE = 26, ASSEMBLER = 27;
+var COLORS = ['white','orange','magenta','light_blue','yellow','lime','pink','gray','light_gray','cyan','purple','blue','brown','green','red','black'];
+var WOODS = ['oak','spruce','birch','dark_oak','jungle','acacia','cherry','crimson','warped'];
+var WOOL_RGB = { white:15263976, orange:15758867, magenta:12403891, light_blue:3847130, yellow:16701501, lime:8439583, pink:15961258, gray:4673362, light_gray:10263959, cyan:1481885, purple:8991415, blue:3949738, brown:8606770, green:6126613, red:11546150, black:1907745 };
+var PLANK_RGB = { oak:12096607, spruce:7029286, birch:14010764, dark_oak:4073746, jungle:12093284, acacia:11032114, cherry:15254712, crimson:7025476, warped:2845534 };
+var LOG_RGB = { oak:7034937, spruce:3811096, birch:14011809, dark_oak:3680789, jungle:5655086, acacia:6775127, cherry:3874850, crimson:6037811, warped:3817301 };
+var ANDESITE_RGB = 8019002;
+/* crystal hull materials: every glass the game has + the aeronautics rocks */
+var CRYSTAL_RGB = {
+  glass: 0xcfe9f7, tinted_glass: 0x4a4f6e, amethyst_block: 0x8a5cf0,
+  levitite: 0x9d8ee8, pearlescent_levitite: 0xd8b8f0,
+  white_stained_glass: 0xe8f4f6, orange_stained_glass: 0xf0a860,
+  magenta_stained_glass: 0xd860c4, light_blue_stained_glass: 0x8cc8e8,
+  yellow_stained_glass: 0xf0e068, lime_stained_glass: 0x9ce868,
+  pink_stained_glass: 0xf0a8c8, gray_stained_glass: 0x8a949a,
+  light_gray_stained_glass: 0xaab4ba, cyan_stained_glass: 0x6fc8d8,
+  purple_stained_glass: 0xb878e8, blue_stained_glass: 0x6a8ce8,
+  brown_stained_glass: 0x9e7448, green_stained_glass: 0x74c868,
+  red_stained_glass: 0xe86868, black_stained_glass: 0x3c444c
+};
+/* inclusion materials: glow blocks to light a crystal from the inside */
+var INCLUSION_RGB = {
+  sea_lantern: 0xbfe3c8, amethyst_block: 0x9b6ff0, glowstone: 0xd8c47a,
+  shroomlight: 0xd89a6a, verdant_froglight: 0xc8e8a0,
+  ochre_froglight: 0xe8d8a0, pearlescent_froglight: 0xd8b8e8
+};
+var COLOR_CODES = { white:'wh', orange:'or', magenta:'ma', light_blue:'lb', yellow:'ye', lime:'li', pink:'pk', gray:'gy', light_gray:'lg', cyan:'cy', purple:'pu', blue:'bl', brown:'br', green:'gn', red:'re', black:'bk' };
+/* balloonshaper.xyz's REAL hot-air profile (closed form, not a spline):
+   narrow throat at 0.15·halfW, sine flare up to full width at yPeak = 0.62·H,
+   then an ellipse cap that tapers to a POINT at the very top. */
+function buildHotairProfile(p) {
+  var W = Math.min(p.lengthX, p.widthZ), H = p.heightY;
+  var halfW = W / 2, yPeak = 0.62 * H, minR = halfW * 0.15;
+  var Y = H + 2;
+  var pts = [];
+  for (var py = 0; py < Y; py++) {
+    var yn = py / (Y - 1);
+    var y = yn * H;
+    var r;
+    if (y <= yPeak) {
+      var t = y / yPeak;
+      r = minR + (halfW - minR) * Math.sin(t * Math.PI / 2);
+    } else {
+      var t2 = (y - yPeak) / (H - yPeak);
+      r = halfW * Math.sqrt(Math.max(0, 1 - t2 * t2));
+    }
+    pts.push({ y: yn, r: r / halfW });
+  }
+  return pts;
+}
+var CODE_COLORS = Object.fromEntries(Object.entries(COLOR_CODES).map(function(e){ return [e[1], e[0]]; }));
+var WOOD_CODES = { oak:'o', spruce:'s', birch:'b', dark_oak:'d', jungle:'j', acacia:'a', cherry:'ch', crimson:'cr', warped:'wa' };
+var CODE_WOODS = Object.fromEntries(Object.entries(WOOD_CODES).map(function(e){ return [e[1], e[0]]; }));
+
+/* ================= presets ================= */
+/* Perfect hot-air balloon (balloonshaper.xyz closed-form profile): round
+   cross-section (L = W, odd -> single center block), H/L ~ 1.15-1.35, narrow
+   throat, sine flare to full width at 62% height, crown tapering to a point.
+   profileScale fine-tunes the width so the interior lands on an exact
+   500-multiple. ★ = exact; ≈ = a block or two short (no wasted burner). */
+var BALLOON_PRESETS = [
+  { name: 'Hot Air 18000 ★ 36 burners · 6.22 vol/wool', exact: true, p: { lengthX: 33, widthZ: 33, heightY: 38, profileScale: 1.031 } },
+  { name: 'Hot Air 17500 ★ 35 burners · 6.08 vol/wool', exact: true, p: { lengthX: 35, widthZ: 35, heightY: 40, profileScale: 0.934 } },
+  { name: 'Hot Air 18500 ★ 37 burners · 5.88 vol/wool', exact: true, p: { lengthX: 39, widthZ: 39, heightY: 48, profileScale: 0.790 } },
+  { name: 'Hot Air 16000 ★ 32 burners · 5.78 vol/wool', exact: true, p: { lengthX: 35, widthZ: 35, heightY: 40, profileScale: 0.896 } },
+  { name: 'Hot Air 15000 ★ 30 burners · 5.66 vol/wool', exact: true, p: { lengthX: 31, widthZ: 31, heightY: 40, profileScale: 0.983 } },
+  { name: 'Hot Air 15500 ★ 31 burners · 5.60 vol/wool', exact: true, p: { lengthX: 33, widthZ: 33, heightY: 44, profileScale: 0.897 } },
+  { name: 'Hot Air 16500 ★ 33 burners · 5.59 vol/wool', exact: true, p: { lengthX: 41, widthZ: 41, heightY: 48, profileScale: 0.713 } },
+  { name: 'Hot Air 14500 ★ 29 burners · 5.58 vol/wool', exact: true, p: { lengthX: 33, widthZ: 33, heightY: 40, profileScale: 0.908 } },
+  { name: 'Hot Air 13000 ★ 26 burners · 5.42 vol/wool', exact: true, p: { lengthX: 29, widthZ: 29, heightY: 36, profileScale: 1.031 } },
+  { name: 'Hot Air 12500 ★ 25 burners · 5.41 vol/wool', exact: true, p: { lengthX: 29, widthZ: 29, heightY: 34, profileScale: 1.041 } },
+  { name: 'Hot Air 14000 ★ 28 burners · 5.35 vol/wool', exact: true, p: { lengthX: 35, widthZ: 35, heightY: 44, profileScale: 0.806 } },
+  { name: 'Hot Air 11500 ★ 23 burners · 5.21 vol/wool', exact: true, p: { lengthX: 29, widthZ: 29, heightY: 36, profileScale: 0.973 } },
+  { name: 'Hot Air 11000 ★ 22 burners · 5.08 vol/wool', exact: true, p: { lengthX: 27, widthZ: 27, heightY: 36, profileScale: 1.025 } },
+  { name: 'Hot Air 10000 ★ 20 burners · 5.02 vol/wool', exact: true, p: { lengthX: 27, widthZ: 27, heightY: 32, profileScale: 1.037 } },
+  { name: 'Hot Air 9000 ★ 18 burners · 4.79 vol/wool',  exact: true, p: { lengthX: 25, widthZ: 25, heightY: 30, profileScale: 1.106 } },
+  { name: 'Hot Air 9500 ★ 19 burners · 4.78 vol/wool',  exact: true, p: { lengthX: 27, widthZ: 27, heightY: 36, profileScale: 0.959 } },
+  { name: 'Hot Air 8500 ★ 17 burners · 4.63 vol/wool',  exact: true, p: { lengthX: 25, widthZ: 25, heightY: 32, profileScale: 1.040 } },
+  { name: 'Hot Air 8000 ★ 16 burners · 4.55 vol/wool',  exact: true, p: { lengthX: 25, widthZ: 25, heightY: 32, profileScale: 1.008 } },
+  { name: 'Hot Air 7500 ★ 15 burners · 4.50 vol/wool',  exact: true, p: { lengthX: 23, widthZ: 23, heightY: 28, profileScale: 1.148 } },
+  { name: 'Hot Air 7000 ≈ 14 burners · 1 waste · 4.30',  exact: false, p: { lengthX: 27, widthZ: 27, heightY: 31, profileScale: 0.896 } },
+  { name: 'Hot Air 6500 ≈ 13 burners · 2 waste · 4.29',  exact: false, p: { lengthX: 23, widthZ: 23, heightY: 28, profileScale: 1.064 } },
+  { name: 'Hot Air 6000 ★ 12 burners · 4.17 vol/wool',  exact: true, p: { lengthX: 21, widthZ: 21, heightY: 26, profileScale: 1.175 } },
+  { name: 'Hot Air 5500 ★ 11 burners · 3.98 vol/wool',  exact: true, p: { lengthX: 21, widthZ: 21, heightY: 28, profileScale: 1.079 } },
+  { name: 'Hot Air 5000 ≈ 10 burners · 1 waste · 3.84',  exact: false, p: { lengthX: 21, widthZ: 21, heightY: 27, profileScale: 1.048 } },
+  { name: 'Hot Air 4500 ≈ 9 burners · 2 waste · 3.71',   exact: false, p: { lengthX: 19, widthZ: 19, heightY: 24, profileScale: 1.184 } },
+  { name: 'Hot Air 4000 ★ 8 burners · 3.57 vol/wool',   exact: true, p: { lengthX: 19, widthZ: 19, heightY: 22, profileScale: 1.165 } },
+  { name: 'Hot Air 3500 ★ 7 burners · 3.44 vol/wool',   exact: true, p: { lengthX: 19, widthZ: 19, heightY: 22, profileScale: 1.087 } },
+  { name: 'Hot Air 3000 ★ 6 burners · 3.17 vol/wool',   exact: true, p: { lengthX: 17, widthZ: 17, heightY: 22, profileScale: 1.139 } },
+  { name: 'Hot Air 2500 ★ 5 burners · 2.98 vol/wool',   exact: true, p: { lengthX: 17, widthZ: 17, heightY: 20, profileScale: 1.087 } },
+  { name: 'Hot Air 2000 ≈ 4 burners · 1 waste · 2.78',   exact: false, p: { lengthX: 15, widthZ: 15, heightY: 19, profileScale: 1.156 } },
+  { name: 'Hot Air 1500 ★ 3 burners · 2.43 vol/wool',   exact: true, p: { lengthX: 15, widthZ: 15, heightY: 20, profileScale: 0.980 } },
+  { name: 'Hot Air 1000 ★ 2 burners · 1.99 vol/wool',   exact: true, p: { lengthX: 15, widthZ: 15, heightY: 20, profileScale: 0.832 } },
+  { name: 'Hot Air 500 ≈ 1 burners · 1 waste · 1.55',    exact: false, p: { lengthX: 11, widthZ: 11, heightY: 15, profileScale: 0.964 } },
+  { name: 'Hot Air (classic)',        perfect: false, p: { lengthX: 16, widthZ: 16, heightY: 24, shell: 1, topFlatten: 0.15, bottomFlatten: 0 } },
+  { name: 'Fat Balloon',              perfect: false, p: { lengthX: 22, widthZ: 22, heightY: 18, shell: 1, topFlatten: 0.08, bottomFlatten: 0 } },
+  { name: 'Sphere',                   perfect: false, p: { lengthX: 18, widthZ: 18, heightY: 18, shell: 1, topFlatten: 0, bottomFlatten: 0 } },
+  { name: 'Round Blimp',              perfect: false, p: { lengthX: 36, widthZ: 18, heightY: 16, shell: 1, topFlatten: 0, bottomFlatten: 0 } },
+  { name: 'Tube',                     perfect: false, p: { lengthX: 50, widthZ: 14, heightY: 14, shell: 1, cylinderMid: 0.6, topFlatten: 0, bottomFlatten: 0 } },
+  { name: 'Zeppelin',                 perfect: false, p: { lengthX: 60, widthZ: 14, heightY: 14, shell: 1, frontTaper: 0.4, rearTaper: 0.6, topFlatten: 0.05, bottomFlatten: 0.1 } },
+  { name: 'Teardrop',                 perfect: false, p: { lengthX: 30, widthZ: 16, heightY: 20, shell: 1, rearTaper: 0.8, topFlatten: 0, bottomFlatten: 0.15 } },
+  { name: 'Egg',                      perfect: false, p: { lengthX: 14, widthZ: 12, heightY: 18, shell: 1, topFlatten: 0.1, bottomFlatten: 0.05 } },
+  { name: 'Cigar',                    perfect: false, p: { lengthX: 70, widthZ: 10, heightY: 10, shell: 1, cylinderMid: 0.65, frontTaper: 0.2, rearTaper: 0.2, topFlatten: 0, bottomFlatten: 0 } },
+  { name: 'Torpedo',                  perfect: false, p: { lengthX: 50, widthZ: 10, heightY: 10, shell: 1, frontTaper: 0.7, rearTaper: 0.8, topFlatten: 0, bottomFlatten: 0 } },
+  { name: 'Sky Whale',                perfect: false, p: { lengthX: 50, widthZ: 20, heightY: 18, shell: 1, cylinderMid: 0.2, frontTaper: 0.4, rearTaper: 0.2, topFlatten: 0.1, bottomFlatten: 0.15 } },
+  { name: 'Dirigible',                perfect: false, p: { lengthX: 90, widthZ: 16, heightY: 18, shell: 1, cylinderMid: 0.5, frontTaper: 0.3, rearTaper: 0.5, topFlatten: 0.05, bottomFlatten: 0.08 } },
+];
+
+var PROP_PRESETS = [
+  { name: 'Basic',      p: { blades: 4, length: 10, rootChord: 3, tipChord: 1, sweepDegrees: 25, swept: true, airfoilShape: 'curved', bladeMaterial: 'wool', bladeColor: 'white' } },
+  { name: 'Speed',      p: { blades: 2, length: 15, rootChord: 2, tipChord: 1, sweepDegrees: 35, swept: true, airfoilShape: 'curved', bladeMaterial: 'wool', bladeColor: 'white' } },
+  { name: 'Cargo',      p: { blades: 4, length: 12, rootChord: 5, tipChord: 3, sweepDegrees: 15, swept: true, airfoilShape: 'curved', bladeMaterial: 'wool', bladeColor: 'white' } },
+  { name: 'Scimitar',   p: { blades: 5, length: 20, rootChord: 3, tipChord: 1, sweepDegrees: 50, swept: true, airfoilShape: 'curved', bladeMaterial: 'sail', bladeColor: 'white' } },
+  { name: 'Giant',      p: { blades: 3, length: 40, rootChord: 6, tipChord: 2, sweepDegrees: 30, swept: true, airfoilShape: 'curved', bladeMaterial: 'sail', bladeColor: 'white' } },
+  { name: 'Colossal',   p: { blades: 4, length: 50, rootChord: 8, tipChord: 3, sweepDegrees: 30, swept: true, airfoilShape: 'curved', bladeMaterial: 'sail', bladeColor: 'white' } },
+];
+
+/* ================= wings module ================= */
+var DEFAULT_WINGS = { halfSpan: 12, rootChord: 6, tipChord: 2, sweepBlocks: 3, planform: 'tapered', wingBlock: 'copycat_wing', mirror: true };
+
+var WING_PRESETS = [
+  { name: 'Glider (long span)', p: { halfSpan: 20, rootChord: 5, tipChord: 1, sweepBlocks: 1, planform: 'tapered' } },
+  { name: 'Fighter (swept)', p: { halfSpan: 12, rootChord: 7, tipChord: 2, sweepBlocks: 6, planform: 'tapered' } },
+  { name: 'Delta', p: { halfSpan: 14, rootChord: 12, tipChord: 1, sweepBlocks: 0, planform: 'delta' } },
+  { name: 'Stubby (wing_12)', p: { halfSpan: 8, rootChord: 6, tipChord: 3, sweepBlocks: 2, planform: 'tapered', wingBlock: 'copycat_wing_12' } },
+];
+
+/* ================= state ================= */
+var state = { tab: 'balloon', params: {}, result: null, frameVersion: 0,
+  crystalAudit: null, crystalCheck: null, uploadPalette: null };
+var DEFAULT_BALLOON = {
+  lengthX: 33, widthZ: 33, heightY: 38, cylinderMid: 0, frontTaper: 0, rearTaper: 0,
+  topFlatten: 0, bottomFlatten: 0, hollow: true, shell: 1, prune: true,
+  perfect: true, profileScale: 1.031,
+  ribEnabled: false, ribSpacing: 4, ribOffset: 0, keelEnabled: false, keelDepth: 1,
+  finEnabled: false, sideFinEnabled: false, finHeight: 4, finLength: 5,
+  envelopeMaterial: 'wool', envelopeColor: 'white', frameMaterial: 'wood', frameWoodType: 'spruce',
+  blockMass: 1, payload: 0
+};
+var DEFAULT_PROP = {
+  blades: 4, length: 10, rootChord: 3, tipChord: 1, sweepDegrees: 25, swept: true,
+  airfoilShape: 'curved', bladeMaterial: 'wool', bladeColor: 'white',
+  rotation: 0, orientation: 'horizontal', forceCenter: true
+};
+state.params = Object.assign({}, DEFAULT_BALLOON);
+
+/* ================= module registry (after defaults so defs resolve) ================= */
+/* ================= crystal module =================
+   The rhombus crystal shard, Blade & Sorcery style: double-terminated
+   (a point at BOTH ends — the /\ over \/ diamond), angled by the lean
+   sliders so it reads like a bullet mid-flight. Imperfect by design:
+   every slider controls a seeded inconsistency, so a share link
+   reproduces the exact same shard. The studio sizes the cavity's
+   burners and lift — you fit the interior. No deck, no drive. */
+var DEFAULT_CRYSTAL = {
+  heightY: 44, baseDiagX: 16, baseDiagZ: 10, facets: 4, taperPower: 1, topCrop: 0,
+  midY: 0.45, midBand: 0.12,
+  twistDeg: 0, leanX: 1, leanZ: 0, asym: 0, jitter: 0.1,
+  crackCount: 2, inclusionPct: 3, seed: 1337,
+  hollow: true, shell: 1, blockMass: 1, payload: 0,
+  material: 'glass', inclusionMaterial: 'sea_lantern', orientation: 'horizontal', centerMode: 'odd',
+  shipX: 0, shipZ: 0
+};
+
+var CRYSTAL_PRESETS = [
+  { name: 'Horizontal Shard ★ flies', p: { } },
+  { name: 'Bullet', p: { heightY: 56, baseDiagX: 14, baseDiagZ: 14, facets: 6, midY: 0.35, midBand: 0.05, taperPower: 1.6, leanX: 2.5, jitter: 0.05, material: 'tinted_glass', seed: 7 } },
+  { name: 'Twin-Spike', p: { heightY: 48, baseDiagX: 12, baseDiagZ: 12, facets: 4, midBand: 0, taperPower: 0.7, leanZ: 2, twistDeg: 60, material: 'levitite', seed: 21 } },
+  { name: 'Amethyst Giant', p: { heightY: 60, baseDiagX: 22, baseDiagZ: 22, facets: 6, midBand: 0.2, taperPower: 0.9, jitter: 0.12, twistDeg: 30, material: 'amethyst_block', inclusionMaterial: 'sea_lantern', seed: 3 } },
+  { name: 'Shattered Hex', p: { heightY: 40, baseDiagX: 24, baseDiagZ: 16, facets: 6, midBand: 0.1, topCrop: 0.25, crackCount: 8, inclusionPct: 5, leanX: 2, asym: 0.15, seed: 77 } },
+  { name: 'Upright Shard', p: { orientation: 'vertical', heightY: 44, baseDiagX: 14, baseDiagZ: 10, leanX: 0, leanZ: 0, centerMode: 'even', seed: 11 } },
+];
+
+/* ================= shapes module ================= */
+var DEFAULT_SHAPES = {
+  kind: 'sphere', sizeX: 20, sizeY: 20, sizeZ: 20, axis: 'y',
+  hollow: true, shell: 1, material: 'wool', envelopeColor: 'white', frameWoodType: 'spruce'
+};
+
+var SHAPES_PRESETS = [
+  { name: 'Sphere (hollow)', p: { kind: 'sphere', sizeX: 20, sizeY: 20, sizeZ: 20 } },
+  { name: 'Dome', p: { kind: 'dome', sizeX: 21, sizeY: 14, sizeZ: 21 } },
+  { name: 'Torus ring', p: { kind: 'torus', sizeX: 30, sizeY: 10, sizeZ: 30 } },
+  { name: 'Cone', p: { kind: 'cone', sizeX: 16, sizeY: 24, sizeZ: 16, axis: 'y' } },
+  { name: 'Pyramid', p: { kind: 'pyramid', sizeX: 20, sizeY: 20, sizeZ: 20 } },
+  { name: 'Cylinder (Y)', p: { kind: 'cylinder', sizeX: 14, sizeY: 20, sizeZ: 14, axis: 'y' } },
+  { name: 'Glass sphere', p: { kind: 'sphere', sizeX: 16, sizeY: 16, sizeZ: 16, material: 'glass' } },
+];
+
+/* ================= lab module =================
+   The schematic lab: drop any .schem / .nbt / .litematic (Sponge v2,
+   structure or Litematica, gzipped or raw)
+   and get a full material audit — block census per namespace, a Create
+   Aeronautics part census, and a mass estimate. No generation. */
+var DEFAULT_LAB = {};
+
+var MODULES = {
+  balloon:    { def: DEFAULT_BALLOON,  presets: BALLOON_PRESETS,  labels: ['Blocks', 'Interior', 'Burners', 'Waste', 'Vol/Wool'] },
+  prop:       { def: DEFAULT_PROP,     presets: PROP_PRESETS,     labels: ['Blocks', 'Blades', 'Swept disc Ø', 'Solidity', 'Bearings'] },
+  wings:      { def: DEFAULT_WINGS,    presets: WING_PRESETS,     labels: ['Blocks', 'Wingspan', 'Area', 'Aspect ratio', ''] },
+  crystal:    { def: DEFAULT_CRYSTAL,  presets: CRYSTAL_PRESETS,  labels: ['Blocks', 'Interior', 'Burners', 'Craft mass', 'Net lift'] },
+  shapes:     { def: DEFAULT_SHAPES,   presets: SHAPES_PRESETS,   labels: ['Blocks', 'Interior', 'Shape', 'Shell', ''] },
+  lab:        { def: DEFAULT_LAB,      presets: [],               labels: ['Blocks', 'Materials', 'Namespaces', 'Est. mass', ''] }
+};
+
+/* ================= controls schema ================= */
+var CTLS = {
+  balloon: [
+    { t: 'group', label: 'Size & profile' },
+    { t: 'range', k: 'lengthX',       label: 'Length (X)',  min: 6,  max: 500, step: 1, num: true },
+    { t: 'range', k: 'widthZ',        label: 'Width (Z)',   min: 4,  max: 250, step: 1, num: true },
+    { t: 'range', k: 'heightY',       label: 'Height (Y)',  min: 4,  max: 250, step: 1, num: true },
+    { t: 'chk',   k: 'perfect',       label: 'Perfect profile (balloonshaper)' },
+    { t: 'range', k: 'profileScale',  label: 'Profile scale', min: 0.7, max: 1.3, step: 0.01, group: 'perfect' },
+    { t: 'range', k: 'cylinderMid',   label: 'Cylinder middle', min: 0, max: 0.85, step: 0.01, group: 'ellipse' },
+    { t: 'range', k: 'frontTaper',    label: 'Front taper', min: 0,  max: 1, step: 0.01, group: 'ellipse' },
+    { t: 'range', k: 'rearTaper',     label: 'Rear taper',  min: 0,  max: 1, step: 0.01, group: 'ellipse' },
+    { t: 'range', k: 'topFlatten',    label: 'Bottom flatten', min: 0,  max: 0.5, step: 0.01, group: 'ellipse' },
+    { t: 'range', k: 'bottomFlatten', label: 'Top flatten', min: 0,  max: 0.5, step: 0.01, group: 'ellipse' },
+    { t: 'group', label: 'Structure' },
+    { t: 'seg',   k: 'shell',         label: 'Shell thickness', opts: [1, 2, 3, 4, 5], nums: true },
+    { t: 'chk',   k: 'hollow',        label: 'Hollow' },
+    { t: 'chk',   k: 'prune',         label: 'Minimal envelope (eliminate redundant blocks)' },
+    { t: 'chk',   k: 'ribEnabled',    label: 'Ribs' },
+    { t: 'range', k: 'ribSpacing',    label: 'Rib spacing', min: 2, max: 12, step: 1, num: true, group: 'ribs' },
+    { t: 'range', k: 'ribOffset',     label: 'Rib offset',  min: 0, max: 11, step: 1, num: true, group: 'ribs' },
+    { t: 'chk',   k: 'keelEnabled',   label: 'Keel' },
+    { t: 'seg',   k: 'keelDepth',     label: 'Keel depth',  opts: [1, 2, 3, 4, 5], nums: true, group: 'keel' },
+    { t: 'chk',   k: 'finEnabled',    label: 'Tail fins' },
+    { t: 'chk',   k: 'sideFinEnabled', label: 'Side fins' },
+    { t: 'range', k: 'finHeight',     label: 'Fin height',  min: 2, max: 15, step: 1, num: true, group: 'fins' },
+    { t: 'range', k: 'finLength',     label: 'Fin length',  min: 3, max: 20, step: 1, num: true, group: 'fins' },
+    { t: 'group', label: 'Materials' },
+    { t: 'seg',   k: 'envelopeMaterial', label: 'Envelope material', opts: ['wool', 'envelope'] },
+    { t: 'swatch', k: 'envelopeColor', label: 'Envelope color', opts: COLORS, colors: WOOL_RGB },
+    { t: 'seg',   k: 'frameMaterial', label: 'Frame material', opts: ['wood', 'andesite_casing'], disp: ['wood', 'casing'] },
+    { t: 'swatch', k: 'frameWoodType', label: 'Frame wood', opts: WOODS, colors: PLANK_RGB },
+    { t: 'group', label: 'Lift math' },
+    { t: 'range', k: 'blockMass',     label: 'Avg block mass', min: 0.1, max: 10, step: 0.1 },
+    { t: 'range', k: 'payload',       label: 'Payload mass', min: 0, max: 1000, step: 10, num: true },
+  ],
+  prop: [
+    { t: 'group', label: 'Geometry' },
+    { t: 'range', k: 'blades',       label: 'Blades',        min: 2, max: 12, step: 1, num: true },
+    { t: 'range', k: 'length',       label: 'Length',        min: 3, max: 50, step: 1, num: true },
+    { t: 'range', k: 'rootChord',    label: 'Root chord',    min: 1, max: 40, step: 1, num: true },
+    { t: 'range', k: 'tipChord',     label: 'Tip chord',     min: 0, max: 40, step: 1, num: true },
+    { t: 'range', k: 'sweepDegrees', label: 'Sweep (°)',     min: 0, max: 90, step: 1 },
+    { t: 'range', k: 'rotation',     label: 'Rotation (°)',  min: 0, max: 360, step: 1 },
+    { t: 'chk',   k: 'swept',        label: 'Swept blades' },
+    { t: 'chk',   k: 'forceCenter',  label: 'Force one-block center' },
+    { t: 'group', label: 'Material & mount' },
+    { t: 'seg',   k: 'airfoilShape', label: 'Airfoil',       opts: ['curved', 'linear'] },
+    { t: 'seg',   k: 'bladeMaterial', label: 'Blade material', opts: ['wool', 'sail'] },
+    { t: 'swatch', k: 'bladeColor',  label: 'Blade color',   opts: COLORS, colors: WOOL_RGB },
+    { t: 'seg',   k: 'orientation',  label: 'Orientation',   opts: ['horizontal', 'vertical'] },
+  ],
+  wings: [
+    { t: 'group', label: 'Planform' },
+    { t: 'seg',   k: 'planform',      label: 'Planform',         opts: ['tapered', 'delta'] },
+    { t: 'range', k: 'halfSpan',      label: 'Half-span (X)',    min: 3,  max: 64, step: 1, num: true },
+    { t: 'range', k: 'rootChord',     label: 'Root chord (Z)',   min: 1,  max: 40, step: 1, num: true },
+    { t: 'range', k: 'tipChord',      label: 'Tip chord (Z)',    min: 1,  max: 40, step: 1, num: true, group: 'tapered' },
+    { t: 'range', k: 'sweepBlocks',   label: 'Sweep (blocks)',   min: 0,  max: 32, step: 1, num: true },
+    { t: 'seg',   k: 'wingBlock',     label: 'Wing block',       opts: ['copycat_wing', 'copycat_wing_8', 'copycat_wing_12'], disp: ['wing', 'wing 8', 'wing 12'] },
+    { t: 'chk',   k: 'mirror',        label: 'Mirror (both wings)' },
+  ],
+  crystal: [
+    { t: 'group', label: 'Shape' },
+    { t: 'seg',   k: 'orientation',    label: 'Orientation',         opts: ['horizontal', 'vertical'], disp: ['lying (bullet)', 'upright'] },
+    { t: 'range', k: 'heightY',        label: 'Length (long axis)',  min: 6,   max: 200, step: 1, num: true },
+    { t: 'range', k: 'baseDiagX',      label: 'Widest diagonal X',   min: 5,   max: 100, step: 1, num: true },
+    { t: 'range', k: 'baseDiagZ',      label: 'Widest diagonal Z',   min: 5,   max: 100, step: 1, num: true },
+    { t: 'range', k: 'facets',         label: 'Facets (4 = rhombus)', min: 3,  max: 10, step: 1, num: true },
+    { t: 'range', k: 'taperPower',     label: 'Taper curve',         min: 0.35, max: 1.8, step: 0.05 },
+    { t: 'range', k: 'midY',           label: 'Bulge position (0 = tail, 1 = nose)', min: 0.2, max: 0.8, step: 0.01 },
+    { t: 'range', k: 'midBand',        label: 'Middle band (prism stretch)', min: 0, max: 0.5, step: 0.01 },
+    { t: 'range', k: 'topCrop',        label: 'Truncated tip',       min: 0,  max: 0.5, step: 0.01 },
+    { t: 'range', k: 'twistDeg',       label: 'Twist (°)',           min: 0,  max: 180, step: 1, num: true },
+    { t: 'range', k: 'leanX',          label: 'Nose dip (blocks)',   min: 0, max: 20, step: 0.25, num: true },
+    { t: 'range', k: 'leanZ',          label: 'Lean Z (blocks)',     min: 0, max: 20, step: 0.25, num: true },
+    { t: 'seg',   k: 'centerMode',     label: 'Center',              opts: ['odd', 'even'], disp: ['odd (1 block)', 'even (2×2)'] },
+    { t: 'chk',   k: 'hollow',         label: 'Hollow (cavity = hot-air interior)' },
+    { t: 'seg',   k: 'shell',          label: 'Shell thickness',     opts: [1, 2, 3], nums: true },
+    { t: 'group', label: 'Imperfections' },
+    { t: 'range', k: 'jitter',         label: 'Vertex jitter',       min: 0,  max: 0.4, step: 0.01 },
+    { t: 'range', k: 'asym',           label: 'Asymmetry (X vs Z taper)', min: 0, max: 0.5, step: 0.01 },
+    { t: 'range', k: 'crackCount',     label: 'Cracks',              min: 0,  max: 20, step: 1, num: true },
+    { t: 'range', k: 'inclusionPct',   label: 'Inclusions (% of hull, glow clusters)', min: 0, max: 100, step: 1, num: true, suffix: '%' },
+    { t: 'seed',  k: 'seed',           label: 'Seed (re-rolls every imperfection)' },
+    { t: 'group', label: 'Materials' },
+    { t: 'sel',   k: 'material',       label: 'Crystal material',    opts: ['glass', 'tinted_glass', 'white_stained_glass', 'orange_stained_glass', 'magenta_stained_glass', 'light_blue_stained_glass', 'yellow_stained_glass', 'lime_stained_glass', 'pink_stained_glass', 'gray_stained_glass', 'light_gray_stained_glass', 'cyan_stained_glass', 'purple_stained_glass', 'blue_stained_glass', 'brown_stained_glass', 'green_stained_glass', 'red_stained_glass', 'black_stained_glass', 'amethyst_block', 'levitite', 'pearlescent_levitite'] },
+    { t: 'sel',   k: 'inclusionMaterial', label: 'Inclusion material', opts: ['sea_lantern', 'amethyst_block', 'glowstone', 'shroomlight', 'verdant_froglight', 'ochre_froglight', 'pearlescent_froglight'] },
+    { t: 'group', label: 'Lift math (the interior you fit)' },
+    { t: 'range', k: 'blockMass',      label: 'Avg block mass',      min: 0.1, max: 10, step: 0.1 },
+    { t: 'range', k: 'payload',        label: 'Payload mass',        min: 0, max: 1000, step: 10, num: true },
+    { t: 'group', label: 'Ship placement (balance check)', group: 'ship' },
+    { t: 'range', k: 'shipX',          label: 'Ship &harr; position (X, tail&rarr;nose)', min: -40, max: 40, step: 0.5, num: true, group: 'ship' },
+    { t: 'range', k: 'shipZ',          label: 'Ship &vellip; position (Z, left&rarr;right)', min: -40, max: 40, step: 0.5, num: true, group: 'ship' },
+    { t: 'btn',   k: 'shipAuto',       label: 'Auto-trim ship position', group: 'ship' },
+  ],
+  shapes: [
+    { t: 'group', label: 'Shape' },
+    { t: 'sel',   k: 'kind',           label: 'Shape',               opts: ['sphere', 'ellipsoid', 'cylinder', 'cone', 'pyramid', 'torus', 'dome'] },
+    { t: 'range', k: 'sizeX',          label: 'Size X',              min: 3, max: 200, step: 1, num: true },
+    { t: 'range', k: 'sizeY',          label: 'Size Y',              min: 3, max: 200, step: 1, num: true },
+    { t: 'range', k: 'sizeZ',          label: 'Size Z',              min: 3, max: 200, step: 1, num: true },
+    { t: 'seg',   k: 'axis',           label: 'Axis (cylinder/cone)', opts: ['y', 'x', 'z'], group: 'axiskind' },
+    { t: 'group', label: 'Build' },
+    { t: 'chk',   k: 'hollow',         label: 'Hollow' },
+    { t: 'seg',   k: 'shell',          label: 'Shell thickness',     opts: [1, 2, 3], nums: true },
+    { t: 'seg',   k: 'material',       label: 'Material',            opts: ['wool', 'planks', 'log', 'glass'] },
+    { t: 'swatch', k: 'envelopeColor', label: 'Wool color',          opts: COLORS, colors: WOOL_RGB, group: 'woolmat' },
+    { t: 'swatch', k: 'frameWoodType', label: 'Wood',                opts: WOODS, colors: PLANK_RGB, group: 'woodmat' },
+  ],
+  lab: [],
+};
+
+/* ================= panel builder ================= */
+var CTLREG = { seg: {}, swatch: {} };   /* control elements, for active-state sync + tests */
+var panel = document.getElementById('panel');
+function buildPanel() {
+  if (state.tab === 'lab') { buildLabPanel(); return; }
+  var html = '<div class="presets" id="presets"></div>';
+  var ctl = CTLS[state.tab];
+  for (var i = 0; i < ctl.length; i++) {
+    var c = ctl[i];
+    if (c.t === 'group') {
+      html += '<div class="ptitle">' + c.label + '</div>';
+    } else if (c.t === 'range') {
+      html += '<div class="grp' + (c.group ? ' g-' + c.group : '') + '">' +
+        '<label class="lbl"><span>' + c.label + '</span><b id="v-' + c.k + '"></b></label>' +
+        '<div class="row">' +
+        '<input type="range" id="p-' + c.k + '" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '">' +
+        (c.num ? '<input type="number" id="n-' + c.k + '" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '">' : '') +
+        '</div></div>';
+    } else if (c.t === 'chk') {
+      html += '<label class="sw' + (c.group ? ' g-' + c.group : '') + '"><input type="checkbox" id="p-' + c.k + '"> ' + c.label + '</label>';
+    } else if (c.t === 'seg') {
+      html += '<div class="segrow' + (c.group ? ' g-' + c.group : '') + '"><span class="seglbl">' + (c.label || '') + '</span><div class="seg" id="sg-' + c.k + '">' +
+        c.opts.map(function (o, oi) { return '<button data-v="' + o + '">' + (c.disp ? c.disp[oi] : c.nums ? o : o.replace(/_/g, ' ')) + '</button>'; }).join('') +
+        '</div></div>';
+    } else if (c.t === 'swatch') {
+      html += '<div class="swatchrow' + (c.group ? ' g-' + c.group : '') + '"><span class="seglbl">' + c.label + '</span><div class="swatches" id="sw-' + c.k + '">' +
+        c.opts.map(function (o) {
+          var col = c.colors && c.colors[o] !== undefined ? '#' + c.colors[o].toString(16).padStart(6, '0') : 'transparent';
+          return '<button data-v="' + o + '" title="' + o.replace(/_/g, ' ') + '" style="background:' + col + '"></button>';
+        }).join('') +
+        '</div></div>';
+    } else if (c.t === 'seed') {
+      html += '<div class="seedrow"><span class="seglbl">' + c.label + '</span><div class="inputs">' +
+        '<input type="number" id="n-' + c.k + '" min="0" max="9999" step="1">' +
+        '<button class="dice" id="d-' + c.k + '" title="Re-roll the seed">🎲</button></div></div>';
+    } else if (c.t === 'btn') {
+      html += '<div class="btnrow' + (c.group ? ' g-' + c.group : '') + '"><button class="hbtn" id="p-' + c.k + '">' + c.label + '</button></div>';
+    } else {
+      html += '<div class="selrow' + (c.group ? ' g-' + c.group : '') + '"><span>' + c.label + '</span>' +
+        '<select id="p-' + c.k + '">' + c.opts.map(function (o) { return '<option>' + o + '</option>'; }).join('') +
+        '</select></div>';
+    }
+  }
+  if (state.tab === 'crystal') {
+    html += '<div class="labdrop" id="crystal-drop" style="min-height:74px; margin-top:14px; padding:14px">' +
+      '<b>Drop your ship schematic</b>' +
+      '<span style="font-size:11.5px">balance check — the ship\'s center of mass vs the shard\'s middle, shown inside the crystal</span>' +
+      '<input type="file" id="crystal-file" accept=".schem,.nbt,.litematic" style="display:none">' +
+    '</div>';
+  }
+  panel.innerHTML = html;
+  var pdiv = document.getElementById('presets');
+  var list = MODULES[state.tab].presets || [];
+  for (var j = 0; j < list.length; j++) {
+    var pr = list[j];
+    var b = document.createElement('button');
+    b.textContent = pr.name;
+    if (pr.exact) b.className = 'exact';
+    b.onclick = function (pr) {
+      return function () {
+        Object.assign(state.params, pr.p);
+        syncControls();
+        updateConditional();
+        requestGen(true);
+      };
+    }(pr);
+    pdiv.appendChild(b);
+  }
+  // wire controls
+  for (var k = 0; k < ctl.length; k++) {
+    var cc = ctl[k];
+    if (cc.t === 'group') continue;   /* section headers have no control element */
+    if (cc.t === 'range') {
+      var el = document.getElementById('p-' + cc.k);
+      if (!el) continue;
+      el.addEventListener('input', (function (cc, el) {
+        return function () {
+          state.params[cc.k] = parseFloat(el.value);
+          var nel = document.getElementById('n-' + cc.k);
+          if (nel) nel.value = el.value;
+          document.getElementById('v-' + cc.k).textContent = el.value + (cc.suffix || '');
+          if (cc.k === 'shipX' || cc.k === 'shipZ') { applyShipPos(); }
+          else requestGen(false);
+        };
+      })(cc, el));
+      var numEl = document.getElementById('n-' + cc.k);
+      if (numEl) {
+        numEl.addEventListener('input', (function (cc, numEl) {
+          return function () {
+            var v = parseFloat(numEl.value);
+            if (isNaN(v)) return;
+            v = Math.min(cc.max, Math.max(cc.min, v));
+            state.params[cc.k] = v;
+            document.getElementById('p-' + cc.k).value = v;
+            document.getElementById('v-' + cc.k).textContent = v + (cc.suffix || '');
+            if (cc.k === 'shipX' || cc.k === 'shipZ') { applyShipPos(); }
+            else requestGen(false);
+          };
+        })(cc, numEl));
+      }
+    } else if (cc.t === 'chk') {
+      var el2 = document.getElementById('p-' + cc.k);
+      if (!el2) continue;
+      el2.addEventListener('change', (function (cc, el2) {
+        return function () {
+          state.params[cc.k] = el2.checked;
+          updateConditional();
+          requestGen(false);
+        };
+      })(cc, el2));
+    } else if (cc.t === 'seg') {
+      var segHost = document.getElementById('sg-' + cc.k);
+      if (!segHost) continue;
+      var btns = segHost.children;
+      CTLREG.seg[cc.k] = Array.prototype.slice.call(btns);
+      for (var b2 = 0; b2 < btns.length; b2++) {
+        btns[b2].onclick = (function (cc, b) {
+          return function () {
+            state.params[cc.k] = cc.nums ? parseInt(b.getAttribute('data-v'), 10) : b.getAttribute('data-v');
+            syncControls();
+            updateConditional();
+            requestGen(false);
+          };
+        })(cc, btns[b2]);
+      }
+    } else if (cc.t === 'swatch') {
+      var swHost = document.getElementById('sw-' + cc.k);
+      if (!swHost) continue;
+      var sws = swHost.children;
+      CTLREG.swatch[cc.k] = Array.prototype.slice.call(sws);
+      for (var s2 = 0; s2 < sws.length; s2++) {
+        sws[s2].onclick = (function (cc, b) {
+          return function () {
+            state.params[cc.k] = b.getAttribute('data-v');
+            syncControls();
+            requestGen(false);
+          };
+        })(cc, sws[s2]);
+      }
+    } else if (cc.t === 'seed') {
+      var seedIn = document.getElementById('n-' + cc.k);
+      seedIn.addEventListener('input', (function (cc, seedIn) {
+        return function () {
+          var v = parseInt(seedIn.value, 10);
+          if (isNaN(v)) return;
+          state.params[cc.k] = Math.min(9999, Math.max(0, v));
+          requestGen(false);
+        };
+      })(cc, seedIn));
+      document.getElementById('d-' + cc.k).onclick = function () {
+        state.params[cc.k] = Math.floor(Math.random() * 10000);
+        syncControls();
+        requestGen(true);
+      };
+    } else if (cc.t === 'btn') {
+      var btnEl = document.getElementById('p-' + cc.k);
+      if (!btnEl) continue;
+      btnEl.onclick = (function (cc) {
+        return function () {
+          if (cc.k === 'shipAuto') { autoTrimShip(); }
+        };
+      })(cc);
+    } else {
+      var el3 = document.getElementById('p-' + cc.k);
+      if (!el3) continue;
+      el3.addEventListener('change', (function (cc, el3) {
+        return function () {
+          state.params[cc.k] = el3.value;
+          updateConditional();
+          requestGen(false);
+        };
+      })(cc, el3));
+    }
+  }
+  if (state.tab === 'crystal') {
+    var cdrop = document.getElementById('crystal-drop');
+    var cfile = document.getElementById('crystal-file');
+    cdrop.onclick = function () { cfile.click(); };
+    cfile.onchange = function () { if (cfile.files && cfile.files[0]) crystalCheckFile(cfile.files[0]); };
+    cdrop.addEventListener('dragover', function (e) { e.preventDefault(); cdrop.classList.add('over'); });
+    cdrop.addEventListener('dragleave', function () { cdrop.classList.remove('over'); });
+    cdrop.addEventListener('drop', function (e) {
+      e.preventDefault(); cdrop.classList.remove('over');
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) crystalCheckFile(e.dataTransfer.files[0]);
+    });
+  }
+  syncControls();
+  updateConditional();
+}
+/* ---- crystal balance checker ---- */
+function crystalCheckFile(file) {
+  file.arrayBuffer().then(function (ab) {
+    return Gen.analyzeSchematic(new Uint8Array(ab));
+  }).then(function (audit) {
+    if (!audit.ok) { toast('✘ ' + (audit.error || 'unreadable schematic')); return; }
+    state.crystalAudit = audit;
+    state.uploadPalette = audit.palette;
+    state.crystalCheck = Gen.comCheck(state.result, audit, state.params.shipX, state.params.shipZ);
+    renderPreview(Gen.overlay(state.result, audit, state.params.shipX, state.params.shipZ));
+    updateConditional();
+    updateReq(state.result);
+    toast('Ship loaded — balance checked on all six axes');
+  }).catch(function (err) {
+    toast('✘ ' + (err && err.message ? err.message : err));
+  });
+}
+function clearCom() {
+  state.crystalAudit = null;
+  state.crystalCheck = null;
+  state.params.shipX = 0;
+  state.params.shipZ = 0;
+  if (state.result && state.tab === 'crystal') {
+    syncControls();
+    updateConditional();
+    renderPreview(state.result);
+    updateStats(state.result);
+    updateReq(state.result);
+  }
+}
+/* ship placement sliders: re-check the balance + re-render the overlay
+   WITHOUT regenerating the crystal (the shard itself didn't change) */
+function applyShipPos() {
+  if (!state.result || state.tab !== 'crystal') return;
+  if (state.crystalAudit) {
+    state.crystalCheck = Gen.comCheck(state.result, state.crystalAudit, state.params.shipX, state.params.shipZ);
+    renderPreview(Gen.overlay(state.result, state.crystalAudit, state.params.shipX, state.params.shipZ));
+  }
+  updateReq(state.result);
+}
+/* auto-trim: compute the placement that zeroes the combined craft COM */
+function autoTrimShip() {
+  if (!state.crystalCheck || !state.result) return;
+  var t = state.crystalCheck.autoTrim;
+  state.params.shipX = Math.round(t.x * 2) / 2;
+  state.params.shipZ = Math.round(t.z * 2) / 2;
+  syncControls();
+  applyShipPos();
+  toast('Ship re-positioned to zero the combined craft COM');
+}
+function syncControls() {
+  var ctl = CTLS[state.tab];
+  for (var i = 0; i < ctl.length; i++) {
+    var c = ctl[i];
+    if (c.t === 'group') continue;
+    var v = state.params[c.k];
+    if (c.t === 'range') {
+      var el = document.getElementById('p-' + c.k);
+      if (!el) continue;
+      el.value = v;
+      document.getElementById('v-' + c.k).textContent = v + (c.suffix || '');
+      var nel = document.getElementById('n-' + c.k);
+      if (nel) nel.value = v;
+    } else if (c.t === 'chk') {
+      var cel = document.getElementById('p-' + c.k);
+      if (cel) cel.checked = !!v;
+    } else if (c.t === 'seg') {
+      var segs = CTLREG.seg[c.k] || [];
+      for (var s = 0; s < segs.length; s++) {
+        var sv = segs[s].getAttribute('data-v');
+        segs[s].classList.toggle('active', c.nums ? String(v) === sv : v === sv);
+      }
+    } else if (c.t === 'swatch') {
+      var sws = CTLREG.swatch[c.k] || [];
+      for (var w = 0; w < sws.length; w++) {
+        sws[w].classList.toggle('active', v === sws[w].getAttribute('data-v'));
+      }
+    } else if (c.t === 'seed') {
+      var sel = document.getElementById('n-' + c.k);
+      if (sel) sel.value = v;
+    } else {
+      var el2 = document.getElementById('p-' + c.k);
+      if (el2) el2.value = v;
+    }
+  }
+}
+function updateConditional() {
+  var p = state.params;
+  var show = function (grp, on) {
+    var els = document.querySelectorAll('.g-' + grp);
+    for (var i = 0; i < els.length; i++) els[i].classList.toggle('hidden', !on);
+  };
+  show('ribs', !!p.ribEnabled);
+  show('keel', !!p.keelEnabled);
+  show('fins', !!(p.finEnabled || p.sideFinEnabled));
+  show('perfect', !!p.perfect);
+  show('ellipse', !p.perfect);
+  show('tapered', state.tab === 'wings' && p.planform !== 'delta');
+  show('ship', state.tab === 'crystal' && !!state.crystalAudit);
+  show('axiskind', state.tab === 'shapes' && (p.kind === 'cylinder' || p.kind === 'cone'));
+  show('woolmat', state.tab === 'shapes' && p.material === 'wool');
+  show('woodmat', state.tab === 'shapes' && (p.material === 'planks' || p.material === 'log'));
+  /* minimal envelope: shell thickness is irrelevant — redundant inner layers are pruned */
+  var shellEl = document.getElementById('p-shell');
+  if (shellEl) shellEl.disabled = !!p.prune;
+}
+function switchTab(tab) {
+  state.tab = tab;
+  var btns = document.querySelectorAll('nav.tabs button');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.toggle('active', btns[i].getAttribute('data-tab') === tab);
+  }
+  state.params = Object.assign({}, MODULES[tab].def);
+  updateStatLabels(tab);
+  buildPanel();
+  if (tab === 'lab') { labClear(); }
+  else {
+    if (!state.result) lastGenKey = null;   /* the lab cleared the model — always regenerate */
+    requestGen(true);
+  }
+  /* a carried-in ship audit must show even when the params (and therefore the
+     generated model) did not change — fireGen would skip that case */
+  if (tab === 'crystal' && state.crystalAudit && state.result) {
+    state.crystalCheck = Gen.comCheck(state.result, state.crystalAudit, state.params.shipX, state.params.shipZ);
+    renderPreview(Gen.overlay(state.result, state.crystalAudit, state.params.shipX, state.params.shipZ));
+    updateReq(state.result);
+  }
+}
+function updateStatLabels(tab) {
+  var m = MODULES[tab];
+  var ids = ['lb-blocks', 'lb-interior', 'lb-burners', 'lb-waste', 'lb-eff'];
+  for (var i = 0; i < ids.length; i++) document.getElementById(ids[i]).textContent = m.labels[i];
+}
+var tabBtns = document.querySelectorAll('nav.tabs button');
+for (var t = 0; t < tabBtns.length; t++) {
+  tabBtns[t].onclick = (function (b) {
+    return function () { switchTab(b.getAttribute('data-tab')); };
+  })(tabBtns[t]);
+}
+
+/* ================= worker ================= */
+var worker = null, workerMode = false, genSeq = 0, pendingTimer = null;
+function initEngine(cb) {
+  var done = false;
+  var finish = function () { if (!done) { done = true; cb(); } };
+  try {
+    worker = new Worker('engine-worker.js');
+    worker.onmessage = function (e) {
+      if (e.data.kind === 'solid') onSolidResult(e.data);
+      else onGenResult(e.data);
+    };
+    worker.onerror = function () {
+      /* worker failed (missing files, engine error, blocked, ...) —
+         switch to main-thread mode ONCE instead of recreating workers */
+      if (worker) { try { worker.terminate(); } catch (e2) {} worker = null; }
+      workerMode = true;
+      loadEngineMain(finish);
+    };
+    workerMode = false;
+    finish();
+    /* The stats panels, requirements math and the schematic lab all call
+       Gen.* on the MAIN thread, even when generation runs in the worker —
+       so the engine functions must be defined here in both modes. */
+    loadEngineMain(function () {});
+  } catch (err) {
+    /* workers blocked (e.g. file://) — run the engine on the main thread */
+    workerMode = true;
+    loadEngineMain(finish);
+  }
+}
+function loadEngineMain(cb) {
+  if (typeof Gen !== 'undefined' && Gen && Gen.genBalloon) { cb(); return; }
+  var s = document.createElement('script');
+  s.src = 'engine.js';
+  s.onload = function () { cb(); };
+  s.onerror = function () {
+    showFatal('engine.js failed to load — keep it next to index.html');
+  };
+  document.head.appendChild(s);
+  /* safety net: if onload never fires, poll for the engine */
+  setTimeout(function () {
+    if (typeof Gen !== 'undefined' && Gen && Gen.genBalloon) cb();
+  }, 3000);
+}
+function showFatal(msg) {
+  /* self-contained: must not depend on late-initialized globals (runs at script-eval time) */
+  try {
+    var note = document.getElementById('subsample-note');
+    note.textContent = '⚠ ' + msg;
+    note.style.color = '#e06c6c';
+    note.classList.remove('hidden');
+  } catch (e) {}
+}
+function requestGen(immediate) {
+  if (pendingTimer) { clearTimeout(pendingTimer); pendingTimer = null; }
+  pendingTimer = setTimeout(function () { fireGen(); }, immediate ? 0 : 60);
+}
+var lastGenKey = null;
+function fireGen() {
+  pendingTimer = null;
+  var params = Object.assign({}, state.params);
+  var key = JSON.stringify(params);
+  if (key === lastGenKey) return;   /* identical params: keep the current preview */
+  lastGenKey = key;
+  var id = ++genSeq;
+  if (params.perfect) params.profile = buildHotairProfile(params);
+  if (workerMode) {
+    var r = Gen.gen(state.tab, params);
+    r.id = id; r.kind = state.tab; r.timeMs = 0;
+    onGenResult(r);
+  } else {
+    worker.postMessage({ id: id, kind: state.tab, params: params });
+  }
+}
+function onGenResult(r) {
+  if (r.id !== genSeq) return;
+  state.result = r;
+  if (state.tab === 'crystal' && state.crystalAudit) {
+    state.crystalCheck = Gen.comCheck(r, state.crystalAudit, state.params.shipX, state.params.shipZ);
+  }
+  updateStats(r);
+  if (state.tab === 'crystal' && state.crystalAudit) {
+    renderPreview(Gen.overlay(r, state.crystalAudit, state.params.shipX, state.params.shipZ));
+  } else {
+    renderPreview(r);
+  }
+}
+
+/* ================= stats ================= */
+function updateStats(r) {
+  var set = function (id, v) { document.getElementById(id).textContent = v; };
+  set('st-blocks', r.count.toLocaleString() + (r.wool || r.planks || r.crystalCount ? ' (' +
+    (r.wool ? r.wool + ' wool' : '') +
+    (r.logs ? (r.wool ? ', ' : '') + r.logs + ' log' : '') +
+    (r.planks ? ((r.wool || r.logs) ? ', ' : '') + r.planks + ' plank' : '') +
+    (r.crystalCount ? ((r.wool || r.logs || r.planks) ? ', ' : '') + r.crystalCount + ' crystal' : '') +
+    (r.inclusionTotal ? ((r.wool || r.logs || r.planks || r.crystalCount) ? ', ' : '') + r.inclusionTotal + ' inclusion' : '') +
+    ')' : ''));
+  set('st-size', (r.maxX - r.minX + 1) + '×' + (r.maxY - r.minY + 1) + '×' + (r.maxZ - r.minZ + 1));
+  set('st-time', (r.timeMs === 0 ? '<1' : Math.round(r.timeMs)) + ' ms');
+  var badge = document.getElementById('st-badge');
+  var tab = state.tab, p = state.params;
+  if (tab === 'balloon' && r.hollow) {
+    var v = r.interior;
+    set('st-interior', v.toLocaleString());
+    var burners = Math.ceil(v / 500);
+    set('st-burners', burners + ' (' + (burners * 500).toLocaleString() + ' covered)');
+    var waste = burners * 500 - v;
+    set('st-waste', waste.toLocaleString());
+    var eff = v / Math.max(1, r.count);   /* interior volume per envelope block */
+    set('st-eff', eff.toFixed(2));
+    if (v > 0 && v % 500 === 0) {
+      badge.innerHTML = '<span class="badge exact">✔ EXACT — ' + burners + ' burner' + (burners > 1 ? 's' : '') + ', 0 waste · ' + eff.toFixed(2) + ' vol/wool</span>';
+    } else if (v <= 0) {
+      badge.innerHTML = '<span class="badge solid">cavity closed</span>';
+    } else {
+      badge.innerHTML = '<span class="badge miss">✘ not exact — ' + waste.toLocaleString() + ' blocks wasted · ' + eff.toFixed(2) + ' vol/wool</span>';
+    }
+  } else if (tab === 'balloon') {
+    set('st-interior', '— (solid)');
+    set('st-burners', '—');
+    set('st-waste', '—');
+    set('st-eff', '—');
+    badge.innerHTML = '<span class="badge solid">solid mode</span>';
+  } else if (tab === 'prop') {
+    var pm = Gen.propMath(p, r);
+    set('st-interior', p.blades);
+    set('st-burners', pm.discDia + ' blocks');
+    set('st-waste', (pm.solidity * 100).toFixed(0) + '%');
+    set('st-eff', pm.bearings + ' bearing');
+    badge.innerHTML = '<span class="badge solid">propeller · ' + pm.total.toLocaleString() + ' blocks · ' + pm.perBlade.toFixed(1) + ' per blade</span>';
+  } else if (tab === 'wings') {
+    var span = p.mirror ? p.halfSpan * 2 : p.halfSpan;
+    set('st-interior', span);
+    set('st-burners', r.area.toLocaleString());
+    var asp = span * span / Math.max(1, r.area);
+    set('st-waste', asp.toFixed(1));
+    set('st-eff', '—');
+    badge.innerHTML = '<span class="badge solid">' + p.planform + ' · ' + p.wingBlock.replace('copycat_', '') + '</span>';
+  } else if (tab === 'crystal') {
+    set('st-interior', r.interior.toLocaleString());
+    set('st-burners', r.burners + ' (' + (r.burners * 500).toLocaleString() + ' covered)');
+    set('st-waste', r.mass.toLocaleString());
+    set('st-eff', (r.net >= 0 ? '+' : '') + r.net.toLocaleString());
+    if (r.net >= 0) {
+      badge.innerHTML = '<span class="badge exact">✔ FLIES — ' + r.burners + ' burner' + (r.burners > 1 ? 's' : '') + ' · pure shard, the cavity math is sized for your interior</span>';
+    } else {
+      var cNeed = Math.ceil(-r.net / 1.5);
+      badge.innerHTML = '<span class="badge miss">✘ too heavy — add ' + cNeed.toLocaleString() + ' blocks of heated air (' + Math.ceil(cNeed / 500) + ' more burner' + (Math.ceil(cNeed / 500) > 1 ? 's' : '') + ') or lighten the craft</span>';
+    }
+  } else if (tab === 'shapes') {
+    set('st-interior', r.interior.toLocaleString());
+    set('st-burners', r.kind);
+    set('st-waste', r.hollow ? 'hollow · ' + (r.shell || 1) + '-thick' : 'solid');
+    set('st-eff', '—');
+    badge.innerHTML = '<span class="badge solid">' + r.kind + ' · ' + r.count.toLocaleString() + ' blocks · interior ' + r.interior.toLocaleString() + '</span>';
+  }
+  updateReq(r);
+}
+
+/* ================= requirements panel =================
+   The actual math for each shape, live: what this exact model needs to
+   exist and to fly. Grounded in Create Aeronautics 1.3.0 config
+   (1.5 lift per heated block, 1 burner per 500 blocks). */
+var reqEl = document.getElementById('req'), reqBody = document.getElementById('req-body');
+function reqClear() { reqEl.classList.add('hidden'); reqBody.innerHTML = ''; }
+function reqShow() { reqEl.classList.remove('hidden'); }
+function updateReq(r) {
+  var tab = state.tab, p = state.params;
+  if (!r || tab === 'lab') { reqClear(); return; }
+  var html = '';
+  if (tab === 'balloon') {
+    var m = Gen.mathFor(r, p.blockMass, p.payload);
+    html += '<span>Hot-air lift: <b>' + r.interior.toLocaleString() + ' blocks × 1.5 = ' + m.lift.toLocaleString() + '</b></span>';
+    html += '<span>Burners: <b>' + m.burners + '</b>' + (m.waste ? ' (' + m.waste.toLocaleString() + ' waste)' : ' (exact ✔)') + '</span>';
+    html += '<span>Envelope: <b>' + r.wool.toLocaleString() + ' wool</b>' + (r.logs ? ' + ' + r.logs + ' log' : '') + (r.planks ? ' + ' + r.planks + ' plank' : '') + '</span>';
+    html += '<span>Est. craft mass: <b>' + m.mass.toLocaleString() + '</b> (' + r.count.toLocaleString() + ' blocks × ' + p.blockMass + ' + payload ' + p.payload + ')</span>';
+    html += '<span>Net lift: <b class="' + (m.flies ? 'req-ok' : 'req-bad') + '">' + (m.net >= 0 ? '+' : '') + m.net.toLocaleString() + '</b> ' + (m.flies ? '— it flies' : '— add ' + Math.ceil(-m.net / 1.5).toLocaleString() + ' blocks of heated air') + '</span>';
+    html += '<span class="req-formula">lift = interior × 1.5 · burners = ceil(interior / 500)</span>';
+  } else if (tab === 'prop') {
+    var pm2 = Gen.propMath(p, r);
+    html += '<span>Blades: <b>' + pm2.blades + '</b> · ' + pm2.total.toLocaleString() + ' ' + pm2.material + ' blocks (' + pm2.perBlade.toFixed(1) + ' per blade)</span>';
+    html += '<span>Swept disc: <b>Ø ' + pm2.discDia + ' blocks</b> · area π×' + p.length + '² = ' + Math.round(pm2.discArea).toLocaleString() + '</span>';
+    html += '<span>Blade coverage: <b>' + (pm2.solidity * 100).toFixed(0) + '%</b> of the disc</span>';
+    html += '<span>Mount: <b>1× propeller_bearing</b> on a rotating Create shaft' + (pm2.blades >= 5 ? ' (high blade counts want a rotation_speed_controller)' : '') + '</span>';
+    html += '<span class="req-formula">disc area = π × length² · bearing = 1 per propeller</span>';
+  } else if (tab === 'wings') {
+    html += '<span>Wing blocks: <b>' + r.area.toLocaleString() + '× ' + (p.wingBlock || 'copycat_wing') + '</b></span>';
+    html += '<span>Span: <b>' + (p.mirror ? p.halfSpan * 2 : p.halfSpan) + ' blocks</b> · planform: ' + p.planform + '</span>';
+    html += '<span class="req-formula">copycat wings are 16×8/12/14×16 px flat panels — place on your ship, force acts at each block</span>';
+  } else if (tab === 'crystal') {
+    var cm = Gen.mathFor(r, p.blockMass, p.payload);
+    html += '<span>Shard hull: <b>' + r.crystalCount.toLocaleString() + ' ' + p.material.replace(/_/g, ' ') + '</b>' + (r.inclusionTotal ? ' + ' + r.inclusionTotal + ' ' + p.inclusionMaterial.replace(/_/g, ' ') : '') + (r.cracksMade ? ' · ' + r.cracksMade + ' crack' + (r.cracksMade > 1 ? 's' : '') : '') + '</span>';
+    html += '<span>Center: <b>' + (r.centerMode === 'even' ? 'even — the middle lands on a 2×2 junction' : 'odd — single block at the middle') + '</b> · nose dip ' + r.leanX + ' block' + (r.leanX === 1 ? '' : 's') + '</span>';
+    html += '<span>Cavity (your interior): <b>' + r.interior.toLocaleString() + ' blocks</b> → lift ' + cm.lift.toLocaleString() + '</span>';
+    html += '<span>Burners: <b>' + cm.burners + '</b>' + (cm.waste ? ' (' + cm.waste.toLocaleString() + ' waste)' : ' (exact ✔)') + '</span>';
+    html += '<span>Craft mass: <b>' + cm.mass.toLocaleString() + '</b> (blocks × ' + p.blockMass + ' + payload ' + p.payload + ')</span>';
+    html += '<span>Net lift: <b class="' + (cm.flies ? 'req-ok' : 'req-bad') + '">' + (cm.net >= 0 ? '+' : '') + cm.net.toLocaleString() + '</b> ' + (cm.flies ? '— it flies' : '— add ' + Math.ceil(-cm.net / 1.5).toLocaleString() + ' blocks of heated air') + '</span>';
+    html += '<span class="req-formula">same seed + same sliders = same crystal · seed ' + p.seed + '</span>';
+    if (state.crystalCheck) {
+      var ck = state.crystalCheck;
+      var b = ck.ship, cb = ck.combined;
+      var f = function (v) { return (v >= 0 ? '+' : '') + v.toFixed(1); };
+      var axc = function (a) { return a.status === 'ok' ? 'req-ok' : 'req-bad'; };
+      var dir = function (v, pos, neg, ok) { return v > 0.5 ? pos : (v < -0.5 ? neg : ok); };
+      var vname = function (v) { return v === 'ok' ? 'PERFECTLY STRAIGHT' : (v === 'wonky' ? 'WONKY' : 'UNEVEN'); };
+      /* the ship's own six axes: back/forth, left/right, up/down,
+         tilt (roll), pan (pitch) and yaw — each vs its own middle */
+      html += '<span>Ship COM vs its own middle: back/forth <b class="' + axc(b.axes.backForth) + '">' + f(b.offset.x) + ' X</b> · left/right <b class="' + axc(b.axes.leftRight) + '">' + f(b.offset.z) + ' Z</b> · up/down <b class="' + axc(b.axes.upDown) + '">' + f(b.offset.y) + ' Y</b></span>';
+      html += '<span>Tilt (roll): <b class="' + axc(b.axes.tilt) + '">' + dir(b.offset.z, 'leans right', 'leans left', 'level') + '</b> · Pan (pitch): <b class="' + axc(b.axes.pan) + '">' + dir(b.offset.x, 'nose dips', 'tail drags', 'level') + '</b> · Yaw: <b class="' + axc(b.axes.yaw) + '">' + dir(b.yawTwist, 'twists right', 'twists left', 'straight') + '</b> (' + f(b.yawTwist) + ')</span>';
+      html += '<span>Ship verdict: <b class="' + (b.verdict === 'ok' ? 'req-ok' : 'req-bad') + '">' + vname(b.verdict) + '</b>' +
+        (b.fixes.length ? ' — fix: ' + b.fixes.join(' · ') : ' — nothing to fix') + '</span>';
+      /* the combined craft, trimmed by the Ship placement sliders */
+      html += '<span>Combined craft COM (ship in shard): <b class="' + (cb.verdict === 'ok' ? 'req-ok' : 'req-bad') + '">' +
+        f(cb.offset.x) + ' X · ' + f(cb.offset.y) + ' Y · ' + f(cb.offset.z) + ' Z</b> — verdict <b class="' + (cb.verdict === 'ok' ? 'req-ok' : 'req-bad') + '">' + vname(cb.verdict) + '</b> · trim with the Ship placement sliders' +
+        ' · <span class="com-clear" onclick="clearCom()" title="Remove the check">✕ clear</span></span>';
+      var badge = document.getElementById('st-badge');
+      badge.innerHTML = '<span class="badge ' + (cb.verdict === 'ok' ? 'exact' : (cb.verdict === 'wonky' ? 'solid' : 'miss')) + '">' +
+        (cb.verdict === 'ok' ? '✔ PERFECTLY STRAIGHT' : (cb.verdict === 'wonky' ? '⚠ WONKY' : '✘ UNEVEN')) + '</span>';
+    }
+  } else if (tab === 'shapes') {
+    html += '<span>Blocks: <b>' + r.count.toLocaleString() + '</b> of ' + p.material + (p.material === 'wool' ? ' (' + p.envelopeColor + ')' : '') + (p.material === 'planks' || p.material === 'log' ? ' (' + p.frameWoodType + ')' : '') + '</span>';
+    html += '<span>Interior: <b>' + r.interior.toLocaleString() + ' blocks</b> (' + (r.hollow ? 'hollow' : 'solid') + ')</span>';
+    html += '<span>Size: <b>' + r.sizeX + '×' + r.sizeY + '×' + r.sizeZ + '</b></span>';
+    html += '<span class="req-formula">' + r.kind + ' · every shape exports as a real schematic</span>';
+  }
+  reqBody.innerHTML = html;
+  reqShow();
+}
+/* ================= 3D preview ================= */
+var viewport = document.getElementById('viewport');
+var scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0e1013);
+scene.fog = new THREE.FogExp2(0x0e1013, 0.0015);
+var camera = new THREE.PerspectiveCamera(45, 1, 0.1, 4000);
+var renderer = null;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  renderer.setSize(1, 1);
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  viewport.appendChild(renderer.domElement);
+} catch (err) {
+  /* WebGL blocked/unavailable — keep stats working, show a notice */
+  showFatal('3D preview unavailable (WebGL blocked) — stats still work');
+}
+/* sun + shadow rig: one warm directional "sun" is the only shadow-casting
+   light; ambient/fill are kept low so the shadow direction reads clearly.
+   The sun's shadow frustum is refitted to each model in renderPreview(). */
+var ambient = new THREE.AmbientLight(0xffffff, 0.32); scene.add(ambient);
+var sun = new THREE.DirectionalLight(0xfff2dc, 2.6); sun.position.set(60, 90, 50); scene.add(sun);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 10;
+sun.shadow.camera.far = 600;
+sun.shadow.camera.left = -120; sun.shadow.camera.right = 120;
+sun.shadow.camera.top = 120; sun.shadow.camera.bottom = -120;
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.04;
+var dir2 = new THREE.DirectionalLight(0xdfe8ff, 0.55); dir2.position.set(-40, 20, -50); scene.add(dir2);
+var dir3 = new THREE.DirectionalLight(0xffd9a0, 0.28); dir3.position.set(0, -60, 40); scene.add(dir3);
+var hemi = new THREE.HemisphereLight(0xdfe8ff, 0x3a3f4a, 0.3); scene.add(hemi);
+var shadowFallback = false;
+/* shadow capability probe: some software rasterizers (headless SwiftShader,
+   llvmpipe) can't sample three.js shadow maps — the shadow pass writes fine
+   but the main pass never darkens. Detect it and compensate with brighter
+   fill lights so the preview never goes flat and murky. */
+(function () {
+  var ok = false;
+  try {
+    var pr = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+    pr.setSize(64, 64);
+    pr.shadowMap.enabled = true;
+    var ps = new THREE.Scene();
+    ps.background = new THREE.Color(0x808080);
+    var pc = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+    pc.position.set(0, 6, 8); pc.lookAt(0, 0, 0);
+    var pl = new THREE.DirectionalLight(0xffffff, 2);
+    pl.position.set(4, 8, 3);
+    pl.castShadow = true;
+    pl.shadow.mapSize.set(256, 256);
+    pl.shadow.camera.left = -8; pl.shadow.camera.right = 8;
+    pl.shadow.camera.top = 8; pl.shadow.camera.bottom = -8;
+    pl.shadow.camera.updateProjectionMatrix();
+    ps.add(pl);
+    var pp = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshLambertMaterial({ color: 0xaaaaaa }));
+    pp.rotation.x = -Math.PI / 2; pp.receiveShadow = true; ps.add(pp);
+    var pb = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshLambertMaterial({ color: 0xff8844 }));
+    pb.position.y = 1.2; pb.castShadow = true; ps.add(pb);
+    var gl = pr.getContext();
+    var read = function () {
+      var px = new Uint8Array(64 * 64 * 4);
+      gl.readPixels(0, 0, 64, 64, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      return px;
+    };
+    pr.render(ps, pc);
+    var a = read();
+    pr.shadowMap.enabled = false;
+    pr.render(ps, pc);
+    var b = read();
+    for (var i = 0; i < a.length; i += 4) {
+      if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 60) { ok = true; break; }
+    }
+  } catch (e4) { ok = false; }
+  if (!ok) {
+    ambient.intensity = 0.85;
+    sun.intensity = 2.0;
+    dir2.intensity = 0.8;
+    dir3.intensity = 0.4;
+    hemi.intensity = 0.55;
+    sun.castShadow = false;
+    shadowFallback = true;
+  }
+})();
+/* contact-shadow catcher just under the grid: the model throws a readable
+   ground shadow, which also makes self-shadowed faces easier to read */
+var shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(640, 640), new THREE.ShadowMaterial({ opacity: 0.32 }));
+shadowPlane.rotation.x = -Math.PI / 2;
+shadowPlane.position.y = -0.6;
+shadowPlane.receiveShadow = true;
+scene.add(shadowPlane);
+if (shadowFallback) shadowPlane.visible = false;
+/* environment map for metallic materials (casing, iron, brass) */
+try {
+  var pmrem = new THREE.PMREMGenerator(renderer);
+  var envScene = new THREE.Scene();
+  envScene.background = new THREE.Color(0x8a99aa);
+  scene.environment = pmrem.fromScene(envScene).texture;
+  envScene = null;
+} catch (e2) {}
+/* real in-game textures: extracted from the vanilla 1.21.1 client jar and the
+   exact pack mod jars (textures/ folder). Pixel-filtered like the game. */
+var texLoader = new THREE.TextureLoader();
+var texReady = {};
+function texPathFor(type, p) {
+  if (type === WOOL) return 'textures/minecraft/' + (p.envelopeColor || p.bladeColor || 'white') + '_wool.png';
+  if (type === LOG) return p.frameMaterial === 'andesite_casing' ? 'textures/create/andesite_casing.png'
+    : 'textures/minecraft/' + ((p.frameWoodType === 'crimson' ? 'crimson_stem' : p.frameWoodType === 'warped' ? 'warped_stem' : (p.frameWoodType || 'spruce') + '_log')) + '.png';
+  if (type === PLANK) return p.frameMaterial === 'andesite_casing' ? 'textures/create/andesite_casing.png'
+    : 'textures/minecraft/' + (p.frameWoodType || 'spruce') + '_planks.png';
+  if (type === SAIL) return 'textures/create/sail/canvas_' + (p.bladeColor || 'white') + '.png';
+  if (type === WING) return 'textures/create/copycat_base.png';
+  if (type === CRYSTAL) return p.material === 'levitite' ? 'textures/aeronautics/levitite.png'
+    : p.material === 'pearlescent_levitite' ? 'textures/aeronautics/pearlescent_levitite.png'
+    : null;   /* glass / tinted / amethyst: flat translucent color */
+  if (type === AIRBURNER) return 'textures/aeronautics/adjustable_burner.png';
+  if (type === PROPBEARING) return 'textures/aeronautics/propeller_bearing.png';
+  if (type === PROPELLER) return 'textures/aeronautics/propeller_wood.png';
+  if (type === STEERWHEEL) return 'textures/simulated/steering_wheel.png';
+  if (type === THROTTLE) return 'textures/simulated/throttle_lever.png';
+  if (type === ASSEMBLER) return 'textures/simulated/physics_assembler.png';
+  return null;
+}
+/* per-face textures: proper block faces, with atlas-region cropping in
+   16ths like real Minecraft models (regions snapped to pixels, then
+   nearest-upscaled to 64px for authentic pixel crispness). */
+var texFaceCache = {};
+function loadFaceTex(src, region, cb) {
+  var key = src + '|' + (region ? region.join(',') : '');
+  if (texFaceCache[key] !== undefined) return cb(texFaceCache[key]);
+  texLoader.load(src, function (t) {
+    var out = t;
+    if (region) {
+      var img = t.image;
+      var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+      var x0 = Math.round(region[0] / 16 * w), y0 = Math.round(region[1] / 16 * h);
+      var x1 = Math.max(x0 + 1, Math.round(region[2] / 16 * w));
+      var y1 = Math.max(y0 + 1, Math.round(region[3] / 16 * h));
+      var cv = document.createElement('canvas');
+      cv.width = cv.height = 64;
+      var cx = cv.getContext('2d');
+      cx.imageSmoothingEnabled = false;
+      cx.drawImage(img, x0, y0, x1 - x0, y1 - y0, 0, 0, 64, 64);
+      out = new THREE.CanvasTexture(cv);
+    }
+    out.magFilter = THREE.NearestFilter;
+    out.minFilter = THREE.NearestMipmapLinearFilter;
+    out.generateMipmaps = true;
+    out.colorSpace = THREE.SRGBColorSpace;
+    texFaceCache[key] = out;
+    cb(out);
+  }, undefined, function () {
+    texFaceCache[key] = null;
+    cb(null);
+  });
+}
+var TEX_FACES = {};
+function loadFaceSet(material, def) {
+  var F = 6, done = 0, maps = new Array(F);
+  function place(i, t) {
+    maps[i] = t;
+    done++;
+    if (done === F) {
+      material.map = maps;
+      material.color.set(0xffffff);
+      material.needsUpdate = true;
+      needsRender = true;
+    }
+  }
+  for (var fi = 0; fi < F; fi++) {
+    (function (fi) {
+      var face = ['right', 'left', 'top', 'bottom', 'front', 'back'][fi];
+      if (def[face]) {
+        loadFaceTex(def[face], null, function (t) { place(fi, t); });
+      } else if ((face === 'top' || face === 'bottom') && def.top !== undefined) {
+        loadFaceTex(def.top, null, function (t) { place(fi, t); });
+      } else if (face === 'front' && def.front !== undefined) {
+        loadFaceTex(def.front, null, function (t) { place(fi, t); });
+      } else {
+        var region = (face === 'top' || face === 'bottom') ? def.top : def.side;
+        if (region && region.length) loadFaceTex(def.src, region, function (t) { place(fi, t); });
+        else loadFaceTex(def.src, null, function (t) { place(fi, t); });
+      }
+    })(fi);
+  }
+}
+function applyTex(material, path) {
+  if (texReady[path]) {
+    material.map = texReady[path];
+    material.color.set(0xffffff);
+    return;
+  }
+  texLoader.load(path, function (t) {
+    t.magFilter = THREE.NearestFilter;
+    t.minFilter = THREE.NearestMipmapLinearFilter;
+    t.generateMipmaps = true;
+    t.colorSpace = THREE.SRGBColorSpace;
+    texReady[path] = t;
+    material.map = t;
+    material.color.set(0xffffff);
+    material.needsUpdate = true;
+    needsRender = true;
+  }, undefined, function () {
+    /* file:// protocol or missing file: keep the flat-color fallback */
+    texReady[path] = null;
+  });
+}
+var grid = new THREE.GridHelper(160, 32, 0x262a30, 0x181b1f);
+grid.position.y = -0.5;
+scene.add(grid);
+var modelGroup = new THREE.Group();
+scene.add(modelGroup);
+
+var boxGeo = new THREE.BoxGeometry(1, 1, 1);
+var sailGeoH = new THREE.BoxGeometry(1, 0.35, 1);
+var sailGeoV = new THREE.BoxGeometry(1, 1, 0.35);
+var CAP = 250000;
+
+var needsRender = true;
+function renderLoop() {
+  requestAnimationFrame(renderLoop);
+  if (!renderer) return;
+  applyCamera();   /* camera always follows orbit state (cheap: no-ops unless moved) */
+  if (document.getElementById('spin').checked) {
+    modelGroup.rotation.y += 0.005;
+    needsRender = true;
+  }
+  if (needsRender) { needsRender = false; renderer.render(scene, camera); }
+}
+/* NOTE: renderLoop() is started after the orbit controls are defined below
+   (applyCamera reads orbit state) */
+
+var orbit = { theta: 0.6, phi: 1.05, radius: 40, target: new THREE.Vector3(0, 5, 0), dragging: 0, px: 0, py: 0, pinch: 0 };
+/* bind camera controls to the viewport container, not the canvas — dragging works
+   even before the canvas is sized or if WebGL is unavailable */
+var el = viewport;
+if (el) {
+  el.addEventListener('pointerdown', function (e) {
+    /* first interaction dismisses the controls hint — it did its job */
+    var hintEl = document.getElementById('controls-hint');
+    if (hintEl) hintEl.classList.add('hidden');
+    /* right-click handles ALL camera movement: drag = orbit, Shift+drag = pan.
+       Middle-drag also pans. Left-click does nothing. */
+    if (e.button === 0) orbit.dragging = 0;
+    else if (e.button === 1) orbit.dragging = 2;                     /* middle: pan */
+    else if (e.button === 2) orbit.dragging = e.shiftKey ? 2 : 1;    /* right: orbit (Shift: pan) */
+    else return;
+    orbit.px = e.clientX; orbit.py = e.clientY;
+    el.setPointerCapture(e.pointerId);
+  });
+  el.addEventListener('pointermove', function (e) {
+    if (!orbit.dragging) return;
+    var dx = e.clientX - orbit.px, dy = e.clientY - orbit.py;
+    orbit.px = e.clientX; orbit.py = e.clientY;
+    if (orbit.dragging === 1) { orbit.theta -= dx * 0.005; orbit.phi -= dy * 0.005; orbit.phi = Math.max(0.05, Math.min(Math.PI - 0.05, orbit.phi)); }
+    else {
+      /* true screen-space pan: the view slides exactly with the cursor.
+         (world-space up would tilt/zoom the view when the camera is pitched) */
+      var f = orbit.radius * 0.0016;
+      var st = Math.sin(orbit.theta), ct = Math.cos(orbit.theta);
+      var sp = Math.sin(orbit.phi), cp = Math.cos(orbit.phi);
+      /* screen right = (ct, 0, -st), screen up = (-st·cp, sp, -ct·cp) */
+      orbit.target.x += (-dx * ct + dy * -st * cp) * f;
+      orbit.target.y += (dy * sp) * f;
+      orbit.target.z += (dx * st + dy * -ct * cp) * f;
+    }
+    applyCamera();   /* camera must actually follow the orbit state */
+  });
+  el.addEventListener('pointerup', function () { orbit.dragging = 0; });
+  el.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    orbit.radius *= Math.pow(1.1, e.deltaY > 0 ? 1 : -1);
+    orbit.radius = Math.max(6, Math.min(1500, orbit.radius));
+    applyCamera();
+  }, { passive: false });
+  el.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+}
+renderLoop();   /* start the frame loop now that orbit exists */
+function applyCamera() {
+  if (!renderer) return;
+  var x = orbit.target.x + orbit.radius * Math.sin(orbit.phi) * Math.sin(orbit.theta);
+  var y = orbit.target.y + orbit.radius * Math.cos(orbit.phi);
+  var z = orbit.target.z + orbit.radius * Math.sin(orbit.phi) * Math.cos(orbit.theta);
+  /* no-op when the camera didn't move, so the rAF loop doesn't force re-renders */
+  if (camera.position.x === x && camera.position.y === y && camera.position.z === z) return;
+  camera.position.set(x, y, z);
+  camera.lookAt(orbit.target);
+  needsRender = true;
+}
+function frameTo(r) {
+  /* the model is rendered centered at x/z = 0 with its bottom at y = 0,
+     so the rotation pivot must be the MODEL center — not the raw bbox center,
+     otherwise orbiting swings the balloon around an off-center point */
+  var cy = (r.maxY - r.minY) / 2;
+  var d = Math.max(r.maxX - r.minX, r.maxY - r.minY, r.maxZ - r.minZ) + 2;
+  orbit.target.set(0, cy, 0);
+  orbit.radius = d * 2.2;
+  orbit.theta = 0.6; orbit.phi = 1.05;
+  /* keep fog from swallowing huge balloons: fade-out distance scales with the model */
+  if (scene.fog) scene.fog.density = Math.min(0.003, 0.08 / Math.max(8, orbit.radius));
+  applyCamera();
+}
+document.getElementById('fit-btn').onclick = function () {
+  if (state.result) { frameTo(state.result); }
+};
+
+function disposeGroup() {
+  while (modelGroup.children.length) {
+    var m = modelGroup.children[0];
+    modelGroup.remove(m);
+    if (m.material) m.material.dispose();
+    if (m.geometry !== boxGeo && m.geometry !== sailGeoH && m.geometry !== sailGeoV) m.geometry.dispose();
+  }
+}
+/* deterministic per-block brightness variation — "natural light" so a wall
+   of identical blocks doesn't read as one flat colour. Stable: the same
+   coords always get the same shade, so the preview doesn't flicker while
+   you drag sliders. */
+function blockVar(x, y, z) {
+  var h = (Math.imul(x | 0, 2654435761) ^ Math.imul(y | 0, 40503) ^ Math.imul(z | 0, 805459861)) >>> 0;
+  h = (h ^ (h >>> 13)) >>> 0;
+  return 0.93 + (h % 9) * 0.015;   /* 0.93 … 1.05 */
+}
+/* crystals: wider range + a few blocks catching the light like cut facets */
+function crystalVar(x, y, z) {
+  var h = (Math.imul(x | 0, 2654435761) ^ Math.imul(y | 0, 40503) ^ Math.imul(z | 0, 805459861)) >>> 0;
+  h = (h ^ (h >>> 13)) >>> 0;
+  var f = 0.8 + (h % 9) * 0.05;   /* 0.80 … 1.20 */
+  if ((h & 31) === 0) f += 0.25;  /* facet glint */
+  return f;
+}
+
+function renderPreview(r) {
+  if (!renderer) return;   /* stats still work without WebGL */
+  disposeGroup();
+  var p = state.params;
+  var orient = p.orientation === 'vertical';
+  var subsample = 1, count = r.count;
+  var note = document.getElementById('subsample-note');
+  if (count > CAP) {
+    subsample = Math.ceil(count / CAP);
+    note.textContent = 'preview subsampled ×' + subsample + ' (' + count.toLocaleString() + ' blocks, cap ' + CAP.toLocaleString() + ')';    note.classList.remove('hidden');
+  } else {
+    note.classList.add('hidden');
+  }
+  /* groups are keyed by STRING ("w:white", "l:spruce", ...). Keying by the
+     mesh object would collapse every group into "[object Object]" and corrupt
+     the instance counts/matrices whenever more than one block type exists. */
+  var keyOf = function (type) {
+    if (type === WOOL) return 'w:' + (p.envelopeColor || p.bladeColor || 'white');
+    if (type === LOG) return 'l:' + (p.frameMaterial === 'andesite_casing' ? 'andesite' : p.frameWoodType);
+    if (type === PLANK) return 'p:' + (p.frameMaterial === 'andesite_casing' ? 'spruce' : p.frameWoodType);
+    if (type === WING) return 'g:wing';
+    if (type === CRYSTAL) return 'x:' + (p.material || 'glass');
+    if (type === INCLUSION) return 'i:' + (p.inclusionMaterial || 'sea_lantern');
+    if (type === AIRBURNER) return 'n:burner';
+    if (type === PROPBEARING) return 'n:bearing';
+    if (type === PROPELLER) return 'n:prop';
+    if (type === STEERWHEEL) return 'n:wheel';
+    if (type === THROTTLE) return 'n:throttle';
+    if (type === ASSEMBLER) return 'n:assembler';
+    if (type >= 100) return 'u:' + uploadName(type);
+    return 's:' + (p.bladeColor || 'white');
+  };
+  /* pass 1: count blocks per material key */
+  var perKey = {}, typeByKey = {};
+  for (var i = 0; i < r.count; i += subsample) {
+    var tp = r.types[i];
+    var k1 = keyOf(tp);
+    perKey[k1] = (perKey[k1] || 0) + 1;
+    typeByKey[k1] = tp;
+  }
+  /* create meshes with their FINAL instance count up front: in three.js r160,
+     setting .count later does NOT resize the instanceMatrix buffer, which makes
+     the GPU reject the draw call (GL_INVALID_OPERATION: "vertex buffer is not
+     big enough for the draw call") and nothing renders. */
+  var meshByKey = {};
+  for (var k2 in perKey) {
+    var type2 = typeByKey[k2], n2 = perKey[k2];
+    var color, rough = 0.85, metal = 0.05, geo = boxGeo;
+    if (type2 === WOOL) { color = WOOL_RGB[p.envelopeColor || 'white'] || WOOL_RGB.white; rough = 0.92; metal = 0; }
+    else if (type2 === LOG) { color = p.frameMaterial === 'andesite_casing' ? ANDESITE_RGB : (LOG_RGB[p.frameWoodType] || LOG_RGB.spruce); rough = 0.8; metal = 0.05; }
+    else if (type2 === PLANK) { color = PLANK_RGB[p.frameMaterial === 'andesite_casing' ? 'spruce' : (p.frameWoodType || 'spruce')] || PLANK_RGB.spruce; rough = 0.75; metal = 0.08; }
+    else if (type2 === WING) { color = 0xe8e8e8; rough = 0.6; metal = 0.4; }
+    else if (type2 === CRYSTAL) { color = CRYSTAL_RGB[p.material] || CRYSTAL_RGB.glass; rough = 0.08; metal = 0; }
+    else if (type2 === INCLUSION) { color = INCLUSION_RGB[p.inclusionMaterial] || INCLUSION_RGB.sea_lantern; rough = 0.35; metal = 0; }
+    else if (type2 === AIRBURNER) { color = 0x8a6a3a; rough = 0.5; metal = 0.6; }
+    else if (type2 === PROPBEARING) { color = 0x6a7278; rough = 0.4; metal = 0.7; }
+    else if (type2 === PROPELLER) { color = 0xa89060; rough = 0.55; metal = 0.4; }
+    else if (type2 === STEERWHEEL) { color = 0xd9b45c; rough = 0.4; metal = 0.75; }
+    else if (type2 === THROTTLE) { color = 0x8e8e93; rough = 0.45; metal = 0.65; }
+    else if (type2 === ASSEMBLER) { color = 0x7a8288; rough = 0.42; metal = 0.72; }
+    else if (type2 >= 100) { color = nameColor(uploadName(type2)); rough = 0.65; metal = 0.15; }
+    else { color = WOOL_RGB[p.bladeColor || 'white'] || WOOL_RGB.white; rough = 0.95; metal = 0; geo = orient ? sailGeoV : sailGeoH; }
+    var mesh = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: color, roughness: rough, metalness: metal }), n2);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    if (type2 === CRYSTAL) { mesh.material.transparent = true; mesh.material.opacity = 0.72; }
+    if (type2 === INCLUSION) { mesh.material.emissive = new THREE.Color(color); mesh.material.emissiveIntensity = 0.85; }
+    /* real texture per block type: face-aware (atlas crops, distinct tops) with flat-color fallback */
+    var faceDef = TEX_FACES[type2];
+    if (faceDef) {
+      loadFaceSet(mesh.material, faceDef);
+    } else {
+      var tpath = texPathFor(type2, p);
+      if (tpath) applyTex(mesh.material, tpath);
+    }
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    modelGroup.add(mesh);
+    meshByKey[k2] = mesh;
+  }
+  /* pass 2: write one instance matrix per block.
+     Model is anchored so the bottom (minY) sits on the grid at y = 0. */
+  var dummy = new THREE.Object3D();
+  var cx = (r.minX + r.maxX) / 2, cz = (r.minZ + r.maxZ) / 2;
+  var filled = {};
+  var tint = new THREE.Color(1, 1, 1);
+  for (var j = 0; j < r.count; j += subsample) {
+    var k3 = keyOf(r.types[j]);
+    var mesh3 = meshByKey[k3];
+    var ci = filled[k3] || 0;
+    var bx = r.positions[j * 3], by = r.positions[j * 3 + 1], bz = r.positions[j * 3 + 2];
+    dummy.position.set(bx - cx, by - r.minY, bz - cz);
+    dummy.updateMatrix();
+    mesh3.setMatrixAt(ci, dummy.matrix);
+    var t3 = r.types[j];
+    var vary = (t3 === CRYSTAL || t3 === INCLUSION) ? crystalVar(bx, by, bz) : blockVar(bx, by, bz);
+    tint.setRGB(vary, vary, vary);
+    mesh3.setColorAt(ci, tint);
+    filled[k3] = ci + 1;
+  }
+  for (var k4 in meshByKey) {
+    var m4 = meshByKey[k4];
+    m4.instanceMatrix.needsUpdate = true;
+    if (m4.instanceColor) m4.instanceColor.needsUpdate = true;
+    m4.computeBoundingSphere();
+  }
+  /* reframe when the shape size changes a lot */
+  var d = Math.max(r.maxX - r.minX, r.maxY - r.minY, r.maxZ - r.minZ);
+  if (state.frameVersion === 0 || Math.abs(d - state.frameD) / (state.frameD || 1) > 0.35) {
+    frameTo(r);
+  }
+  state.frameVersion++;
+  state.frameD = d;
+  applyCamera();
+  /* fit the sun's shadow frustum to the model so the shadow map stays crisp
+     (small models get tight shadows, big models stay inside the map) */
+  var sunHalf = Math.max(d, 8) * 0.75;
+  sun.shadow.camera.left = -sunHalf; sun.shadow.camera.right = sunHalf;
+  sun.shadow.camera.top = sunHalf; sun.shadow.camera.bottom = -sunHalf;
+  sun.shadow.camera.updateProjectionMatrix();
+  /* the scene CONTENT changed — always redraw, even if the camera didn't move
+     (otherwise edits that keep the same bounding box, like propeller tweaks,
+     only appear after you orbit/zoom) */
+  needsRender = true;
+}
+
+/* ================= NBT writer (Sponge v2, same as createmod.com) ================= */
+function NBTWriter() {
+  this.buf = new Uint8Array(1 << 16);
+  this.p = 0;
+}
+NBTWriter.prototype.ensure = function (n) {
+  if (this.p + n > this.buf.length) {
+    var nb = new Uint8Array(Math.max(this.buf.length * 2, this.p + n));
+    nb.set(this.buf);
+    this.buf = nb;
+  }
+};
+NBTWriter.prototype.u8 = function (v) { this.ensure(1); this.buf[this.p++] = v & 0xff; };
+NBTWriter.prototype.i16 = function (v) { this.ensure(2); new DataView(this.buf.buffer).setInt16(this.p, v, false); this.p += 2; };
+NBTWriter.prototype.i32 = function (v) { this.ensure(4); new DataView(this.buf.buffer).setInt32(this.p, v, false); this.p += 4; };
+NBTWriter.prototype.str = function (s) {
+  var b = new TextEncoder().encode(s);
+  this.i16(b.length);
+  this.ensure(b.length);
+  this.buf.set(b, this.p);
+  this.p += b.length;
+};
+NBTWriter.prototype.tagName = function (t, n) { this.u8(t); this.str(n); };
+NBTWriter.prototype.compoundEnd = function () { this.u8(0); };
+NBTWriter.prototype.intField = function (n, v) { this.tagName(3, n); this.i32(v); };
+NBTWriter.prototype.strField = function (n, v) { this.tagName(8, n); this.str(v); };
+NBTWriter.prototype.listStart = function (n, elemType, count) { this.tagName(9, n); this.u8(elemType); this.i32(count); };
+NBTWriter.prototype.listEnd = function (n) { this.tagName(9, n); this.u8(0); this.i32(0); };
+NBTWriter.prototype.i64 = function (v) { this.ensure(8); new DataView(this.buf.buffer).setBigInt64(this.p, BigInt(v), false); this.p += 8; };
+NBTWriter.prototype.longField = function (n, v) { this.tagName(4, n); this.i64(v); };
+NBTWriter.prototype.intArrayField = function (n, arr) {
+  this.tagName(11, n); this.i32(arr.length);
+  for (var i = 0; i < arr.length; i++) this.i32(arr[i]);
+};
+NBTWriter.prototype.longArrayField = function (n, arr) {
+  this.tagName(12, n); this.i32(arr.length);
+  for (var i = 0; i < arr.length; i++) this.i64(arr[i]);
+};
+
+function blockName(type, p) {
+  if (type === WOOL) return 'minecraft:' + (p.envelopeColor || 'white') + '_wool';
+  if (type === LOG) return p.frameMaterial === 'andesite_casing' ? 'create:andesite_casing' : 'minecraft:' + (p.frameWoodType || 'spruce') + '_log';
+  if (type === PLANK) return 'minecraft:' + (p.frameMaterial === 'andesite_casing' ? 'spruce' : (p.frameWoodType || 'spruce')) + '_planks';
+  if (type === WING) return 'createpropulsionsimulated:' + (p.wingBlock || 'copycat_wing');
+  if (type === CRYSTAL) {
+    var cm = p.material || 'glass';
+    if (cm === 'levitite') return 'aeronautics:levitite';
+    if (cm === 'pearlescent_levitite') return 'aeronautics:pearlescent_levitite';
+    return 'minecraft:' + cm;   /* glass, tinted_glass, amethyst_block, *_stained_glass */
+  }
+  if (type === INCLUSION) {
+    var im = p.inclusionMaterial || 'sea_lantern';
+    return 'minecraft:' + im;   /* sea_lantern, amethyst_block, glowstone, shroomlight, *_froglight */
+  }
+  if (type === AIRBURNER) return 'aeronautics:adjustable_burner';
+  if (type === PROPBEARING) return 'aeronautics:propeller_bearing';
+  if (type === PROPELLER) return 'aeronautics:wooden_propeller';
+  if (type === STEERWHEEL) return 'simulated:steering_wheel';
+  if (type === THROTTLE) return 'simulated:throttle_lever';
+  if (type === ASSEMBLER) return 'simulated:physics_assembler';
+  return 'create:' + (p.bladeColor || 'white') + '_sail';
+}
+/* blockstate properties: machines carry a prop table (r.propTable), one entry
+   per distinct state; props[i] indexes into it. Real Create states, real values. */
+function blockKey(type, pr, r, p) {
+  var name = blockName(type, p);
+  if (pr && r.propTable && r.propTable[pr]) return name + '|' + JSON.stringify(r.propTable[pr]);
+  return name;
+}
+function buildSchematic(r, p) {
+  // trim to tight bbox and shift to origin
+  var minX = r.minX, minY = r.minY, minZ = r.minZ;
+  var sx = r.maxX - minX + 1, sy = r.maxY - minY + 1, sz = r.maxZ - minZ + 1;
+  var names = [], nameToState = {};
+  /* optional singular center block: a sea lantern at the middle of the bbox,
+     so pasted builds carry a visible center reference (replaces whatever
+     block already sits there) */
+  var addCenter = false;
+  try { addCenter = !!document.getElementById('cb-center').checked; } catch (e) {}
+  var cxc = Math.floor((r.minX + r.maxX) / 2), cyc = Math.floor((r.minY + r.maxY) / 2), czc = Math.floor((r.minZ + r.maxZ) / 2);
+  var w = new NBTWriter();
+  w.u8(10); w.i16(0);                       // root compound, no name
+  w.intField('DataVersion', 3955);
+  w.listStart('size', 3, 3); w.i32(sx); w.i32(sy); w.i32(sz);
+  // palette (dedupe)
+  var palKeys = [], nameToState = {};
+  for (var i = 0; i < r.count; i++) {
+    var key = blockKey(r.types[i], r.props ? r.props[i] : 0, r, p);
+    if (!(key in nameToState)) { nameToState[key] = palKeys.length; palKeys.push(key); }
+  }
+  if (addCenter && !('minecraft:sea_lantern' in nameToState)) {
+    nameToState['minecraft:sea_lantern'] = palKeys.length;
+    palKeys.push('minecraft:sea_lantern');
+  }
+  w.listStart('palette', 10, palKeys.length);
+  for (var j = 0; j < palKeys.length; j++) {
+    var parts = palKeys[j].split('|');
+    w.strField('Name', parts[0]);
+    if (parts[1]) {
+      w.tagName(10, 'Properties');
+      var propsObj = JSON.parse(parts[1]);
+      for (var pk in propsObj) w.strField(pk, propsObj[pk]);
+      w.compoundEnd();
+    }
+    w.compoundEnd();
+  }
+  w.listStart('blocks', 10, r.count + (addCenter ? 1 : 0));
+  for (var k = 0; k < r.count; k++) {
+    var bx = r.positions[k * 3], by = r.positions[k * 3 + 1], bz = r.positions[k * 3 + 2];
+    if (addCenter && bx === cxc && by === cyc && bz === czc) continue;   /* replaced by the marker */
+    w.tagName(9, 'pos'); w.u8(3); w.i32(3);
+    w.i32(bx - minX);
+    w.i32(by - minY);
+    w.i32(bz - minZ);
+    w.intField('state', nameToState[blockKey(r.types[k], r.props ? r.props[k] : 0, r, p)]);
+    w.compoundEnd();
+  }
+  if (addCenter) {
+    w.tagName(9, 'pos'); w.u8(3); w.i32(3);
+    w.i32(cxc - minX);
+    w.i32(cyc - minY);
+    w.i32(czc - minZ);
+    w.intField('state', nameToState['minecraft:sea_lantern']);
+    w.compoundEnd();
+  }
+  w.listEnd('entities');
+  w.compoundEnd();
+  return w.buf.slice(0, w.p);
+}
+/* Litematica native .litematic format: Metadata + one region with a
+   variable-bit BlockStates long array (vanilla LSB-first packing) — what
+   Litematica / Forgematica load natively. Uncompressed NBT. */
+function buildLitematic(r, p, name) {
+  var minX = r.minX, minY = r.minY, minZ = r.minZ;
+  var sx = r.maxX - minX + 1, sy = r.maxY - minY + 1, sz = r.maxZ - minZ + 1;
+  var vol = sx * sy * sz;
+  var addCenter = false;
+  try { addCenter = !!document.getElementById('cb-center').checked; } catch (e) {}
+  var cxc = Math.floor((r.minX + r.maxX) / 2), cyc = Math.floor((r.minY + r.maxY) / 2), czc = Math.floor((r.minZ + r.maxZ) / 2);
+  var palKeys = [], nameToState = {};
+  var cells = new Int32Array(vol);
+  cells.fill(-1);
+  var keyOf = function (i) { return blockKey(r.types[i], r.props ? r.props[i] : 0, r, p); };
+  for (var i = 0; i < r.count; i++) {
+    var key = keyOf(i);
+    var st = nameToState[key];
+    if (st === undefined) { st = palKeys.length; nameToState[key] = st; palKeys.push(key); }
+    var bx = r.positions[i * 3], by = r.positions[i * 3 + 1], bz = r.positions[i * 3 + 2];
+    if (addCenter && bx === cxc && by === cyc && bz === czc) continue;
+    cells[(bx - minX) + (bz - minZ) * sx + (by - minY) * sx * sz] = st;
+  }
+  if (addCenter) {
+    var ck = 'minecraft:sea_lantern';
+    if (nameToState[ck] === undefined) { nameToState[ck] = palKeys.length; palKeys.push(ck); }
+    cells[(cxc - minX) + (czc - minZ) * sx + (cyc - minY) * sx * sz] = nameToState[ck];
+  }
+  /* empty cells (cavities, interiors) become air — palette[0] when needed */
+  var hasAir = false;
+  for (var a = 0; a < vol; a++) { if (cells[a] < 0) { hasAir = true; break; } }
+  if (hasAir) {
+    var shifted = new Int32Array(vol);
+    for (var s1 = 0; s1 < vol; s1++) shifted[s1] = cells[s1] < 0 ? 0 : cells[s1] + 1;
+    cells = shifted;
+    palKeys.unshift('minecraft:air');
+    nameToState = {};
+    for (var pk = 0; pk < palKeys.length; pk++) nameToState[palKeys[pk]] = pk;
+  }
+  var bits = Math.max(2, 32 - Math.clz32(palKeys.length - 1));
+  var nLongs = Math.ceil(vol * bits / 64);
+  var longs = new Array(nLongs).fill(0n);
+  for (var i2 = 0; i2 < vol; i2++) {
+    var v = BigInt(cells[i2]);
+    var bitPos = i2 * bits;
+    var li = Math.floor(bitPos / 64);
+    var bo = bitPos % 64;
+    longs[li] |= v << BigInt(bo);
+    if (bo + bits > 64) {
+      longs[li + 1] |= (v >> BigInt(64 - bo)) & ((1n << BigInt(bo + bits - 64)) - 1n);
+    }
+  }
+  var filled = 0;
+  for (var f2 = 0; f2 < vol; f2++) if (cells[f2] > 0) filled++;
+  var now = Date.now();
+  var w = new NBTWriter();
+  w.u8(10); w.i16(0);
+  /* Litematica requires the root Version tag (isValidData checks for it):
+     version 4 = current schematic format, MinecraftDataVersion = 1.21.1 */
+  w.intField('Version', 4);
+  w.intField('MinecraftDataVersion', 3955);
+  w.tagName(10, 'Metadata');
+  w.intArrayField('EnclosingSize', [sx, sy, sz]);
+  w.strField('Author', 'Aero-Dynamics');
+  w.strField('Name', name || 'aero-dynamics export');
+  w.strField('Description', 'Generated by the Aero-Dynamics studio');
+  w.intField('RegionCount', 1);
+  w.longField('TimeCreated', now);
+  w.longField('TimeModified', now);
+  w.intField('TotalBlocks', filled);
+  w.intField('TotalVolume', vol);
+  w.compoundEnd();
+  w.tagName(10, 'Regions');
+  w.tagName(10, 'main');
+  w.tagName(10, 'Position');
+  w.intField('x', 0); w.intField('y', 0); w.intField('z', 0);
+  w.compoundEnd();
+  w.tagName(10, 'Size');
+  w.intField('x', sx); w.intField('y', sy); w.intField('z', sz);
+  w.compoundEnd();
+  w.listStart('BlockStatePalette', 10, palKeys.length);
+  for (var pj = 0; pj < palKeys.length; pj++) {
+    var parts = palKeys[pj].split('|');
+    w.strField('Name', parts[0]);
+    if (parts[1]) {
+      w.tagName(10, 'Properties');
+      var propsObj = JSON.parse(parts[1]);
+      for (var pk2 in propsObj) w.strField(pk2, propsObj[pk2]);
+      w.compoundEnd();
+    }
+    w.compoundEnd();
+  }
+  w.longArrayField('BlockStates', longs);
+  w.listEnd('TileEntities');
+  w.listEnd('Entities');
+  w.listEnd('PendingBlockTicks');
+  w.listEnd('PendingFluidTicks');
+  w.compoundEnd();
+  w.compoundEnd();
+  w.compoundEnd();
+  return w.buf.slice(0, w.p);
+}
+function gzipBytes(u8) {
+  if (typeof CompressionStream !== 'undefined') {
+    return new Response(new Blob([u8]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+  }
+  return Promise.reject(new Error('no gzip support'));
+}
+function downloadBlob(name, bytes) {
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' }));
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+}
+function doDownload(ext) {
+  if (!state.result) return;
+  if (state.tab === 'lab') { toast('No model loaded — load a schematic in the lab'); return; }
+  var r = state.result, p = state.params;
+  var label = state.tab === 'balloon' ? 'balloon_' + p.lengthX + 'x' + p.widthZ + 'x' + p.heightY
+    : state.tab === 'prop' ? 'prop_' + p.blades + 'blade'
+    : state.tab === 'crystal' ? 'crystal_' + p.heightY + 'shard_seed' + p.seed
+    : state.tab === 'shapes' ? p.kind + '_' + p.sizeX + 'x' + p.sizeY + 'x' + p.sizeZ
+    : state.tab + '_' + (p.lengthX || p.halfSpan || '') + 'x' + (p.widthZ || p.rootChord || '');
+  if (ext === '.litematic') {
+    /* Litematica files are raw NBT — no gzip */
+    downloadBlob(label + '.litematic', buildLitematic(r, p, label));
+    toast('Saved ' + label + '.litematic — for Litematica / Forgematica');
+    return;
+  }
+  /* .nbt = gzipped structure NBT — the Create Schematicannon format */
+  var nbt = buildSchematic(r, p);
+  gzipBytes(nbt).then(function (ab) {
+    downloadBlob(label + ext, ab);
+    toast('Saved ' + label + ext + ' — Create schematic, ' + r.count.toLocaleString() + ' blocks');
+  }).catch(function () { toast('gzip failed'); });
+}
+document.getElementById('dl-btn').onclick = function () { doDownload('.nbt'); };
+document.getElementById('nbt-btn').onclick = function () { doDownload('.litematic'); };
+
+/* ================= share links ================= */
+var ENUM = {
+  envelopeMaterial: { wool: 'w', envelope: 'e' }, frameMaterial: { wood: 'w', andesite_casing: 'a' },
+  airfoilShape: { curved: 'c', linear: 'l' }, bladeMaterial: { wool: 'w', sail: 's' },
+  orientation: { horizontal: 'h', vertical: 'v' },
+  planform: { tapered: 't', delta: 'd' },
+  wingBlock: { copycat_wing: 'w', copycat_wing_8: 'w8', copycat_wing_12: 'w12' },
+  material: { glass: 'g', tinted_glass: 't', amethyst_block: 'a', levitite: 'l', pearlescent_levitite: 'p',
+    white_stained_glass: 'wg', orange_stained_glass: 'og', magenta_stained_glass: 'mg',
+    light_blue_stained_glass: 'lb', yellow_stained_glass: 'yg', lime_stained_glass: 'lm',
+    pink_stained_glass: 'pk', gray_stained_glass: 'gy', light_gray_stained_glass: 'lg',
+    cyan_stained_glass: 'cy', purple_stained_glass: 'pu', blue_stained_glass: 'bu',
+    brown_stained_glass: 'br', green_stained_glass: 'gr', red_stained_glass: 'rd',
+    black_stained_glass: 'bk' },
+  inclusionMaterial: { sea_lantern: 's', amethyst_block: 'a', glowstone: 'g', shroomlight: 'sh',
+    verdant_froglight: 'vf', ochre_froglight: 'of', pearlescent_froglight: 'pf' },
+  axis: { x: 'x', y: 'y', z: 'z' },
+  centerMode: { odd: 'o', even: 'e' },
+  kind: { sphere: 'sp', ellipsoid: 'el', cylinder: 'cy', cone: 'co', pyramid: 'py', torus: 'to', dome: 'do' },
+  envelopeColor: COLOR_CODES, bladeColor: COLOR_CODES, frameWoodType: WOOD_CODES
+};
+var ENUM_DECODE = {};
+for (var _ek in ENUM) {
+  var _m = ENUM[_ek], _inv = {};
+  for (var _n in _m) _inv[_m[_n]] = _n;
+  ENUM_DECODE[_ek] = _inv;
+}
+var FIELD_TYPES = {
+  balloon: { lengthX: 'i', widthZ: 'i', heightY: 'i', cylinderMid: 'f', frontTaper: 'f', rearTaper: 'f', topFlatten: 'f', bottomFlatten: 'f', hollow: 'b', prune: 'b', perfect: 'b', profileScale: 'f', shell: 'i', ribEnabled: 'b', ribSpacing: 'i', keelEnabled: 'b', keelDepth: 'i', finEnabled: 'b', sideFinEnabled: 'b', finHeight: 'i', finLength: 'i', envelopeMaterial: 'e', envelopeColor: 'e', frameMaterial: 'e', frameWoodType: 'e', ribOffset: 'i', blockMass: 'f', payload: 'i' },
+  prop: { blades: 'i', length: 'i', rootChord: 'i', tipChord: 'i', sweepDegrees: 'f', swept: 'b', airfoilShape: 'e', bladeMaterial: 'e', bladeColor: 'e', rotation: 'f', orientation: 'e', forceCenter: 'b' },
+  wings: { halfSpan: 'i', rootChord: 'i', tipChord: 'i', sweepBlocks: 'i', planform: 'e', wingBlock: 'e', mirror: 'b' },
+  crystal: { heightY: 'i', baseDiagX: 'i', baseDiagZ: 'i', facets: 'i', taperPower: 'g', midY: 'f', midBand: 'f', topCrop: 'f', twistDeg: 'f', leanX: 'f', leanZ: 'f', asym: 'f', jitter: 'f', crackCount: 'i', inclusionPct: 'i', seed: 'i', hollow: 'b', shell: 'i', blockMass: 'f', payload: 'i', material: 'e', inclusionMaterial: 'e', orientation: 'e', centerMode: 'e', shipX: 'f', shipZ: 'f' },
+  shapes: { kind: 'e', sizeX: 'i', sizeY: 'i', sizeZ: 'i', axis: 'e', hollow: 'b', shell: 'i', material: 'e', envelopeColor: 'e', frameWoodType: 'e' }
+};
+var FIELD_ORDER = {
+  balloon: ['lengthX','widthZ','heightY','cylinderMid','frontTaper','rearTaper','topFlatten','bottomFlatten','hollow','prune','perfect','profileScale','shell','ribEnabled','ribSpacing','keelEnabled','keelDepth','finEnabled','sideFinEnabled','finHeight','finLength','envelopeMaterial','envelopeColor','frameMaterial','frameWoodType','ribOffset','blockMass','payload'],
+  prop: ['blades','length','rootChord','tipChord','sweepDegrees','swept','airfoilShape','bladeMaterial','bladeColor','rotation','orientation','forceCenter'],
+  wings: ['halfSpan','rootChord','tipChord','sweepBlocks','planform','wingBlock','mirror'],
+  crystal: ['heightY','baseDiagX','baseDiagZ','facets','taperPower','midY','midBand','topCrop','twistDeg','leanX','leanZ','asym','jitter','crackCount','inclusionPct','seed','hollow','shell','blockMass','payload','material','inclusionMaterial','orientation','centerMode','shipX','shipZ'],
+  shapes: ['kind','sizeX','sizeY','sizeZ','axis','hollow','shell','material','envelopeColor','frameWoodType']
+};
+var KIND_PREFIX = { balloon: 'b3', prop: 'p3', wings: 'w4', crystal: 'c5', shapes: 'h5' };
+function encodeParams(tab, params) {
+  var def = MODULES[tab].def;
+  var types = FIELD_TYPES[tab];
+  var parts = [KIND_PREFIX[tab]];
+  var order = FIELD_ORDER[tab];
+  for (var i = 0; i < order.length; i++) {
+    var k = order[i], v = params[k];
+    if (v === undefined || v === def[k]) { parts.push(''); continue; }
+    var t = types[k];
+    if (t === 'b') parts.push(v ? '1' : '0');
+    else if (t === 'f') parts.push(String(Math.round(v * 100)));
+    else if (t === 'g') parts.push(String(Math.round(v * 1000)));   /* 3-decimal precision (profileScale needs it) */
+    else if (t === 'i') parts.push(String(v));
+    else parts.push((ENUM[k] && ENUM[k][v]) || v);
+  }
+  while (parts.length > 1 && parts[parts.length - 1] === '') parts.pop();
+  return parts.join('.');
+}
+function decodeParams(tab, s) {
+  s = s.replace(/^[bpcwh][0-9]\.?/, '');   /* strip kind+version prefix */
+  var def = MODULES[tab].def;
+  var types = FIELD_TYPES[tab];
+  var out = Object.assign({}, def);
+  var parts = s.split('.');
+  var order = FIELD_ORDER[tab];
+  for (var i = 0; i < order.length && i < parts.length; i++) {
+    var raw = parts[i];
+    if (raw === '') continue;
+    var k = order[i], t = types[k];
+    if (t === 'b') out[k] = raw === '1';
+    else if (t === 'f') out[k] = parseFloat(raw) / 100;
+    else if (t === 'g') out[k] = parseFloat(raw) / 1000;
+    else if (t === 'i') out[k] = parseInt(raw, 10);
+    else {
+      var map = ENUM_DECODE[k];
+      if (map && map[raw] !== undefined) out[k] = map[raw];
+      else if (!map) out[k] = raw;
+    }
+  }
+  return out;
+}
+function b64u(s) {
+  return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function unb64u(s) {
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  return decodeURIComponent(escape(atob(s)));
+}
+function shareUrl() {
+  return location.href.split('#')[0] + '#' + b64u(encodeParams(state.tab, state.params));
+}
+document.getElementById('share-btn').onclick = function () {
+  if (state.tab === 'lab') { toast('Nothing to share — the lab audits your files'); return; }
+  var url = shareUrl();
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(function () { toast('Link copied'); });
+  } else {
+    toast(url);
+  }
+};
+function applyHash() {
+  var h = location.hash.replace(/^#/, '');
+  if (!h || h.length < 3) return;
+  var tab = null, compact = null;
+  if (h.charAt(0) === 'b' || h.charAt(0) === 'p') compact = h;
+  else {
+    try { compact = unb64u(h); } catch (e) { return; }
+  }
+  var PREFIX_TAB = { b3: 'balloon', p3: 'prop', w4: 'wings', c5: 'crystal', h5: 'shapes' };
+  if (PREFIX_TAB[compact.slice(0, 2)]) tab = PREFIX_TAB[compact.slice(0, 2)];
+  else return;
+  if (state.tab !== tab) switchTab(tab);
+  state.params = decodeParams(tab, compact);
+  syncControls();
+  updateConditional();
+  requestGen(true);
+}
+window.addEventListener('hashchange', applyHash);
+
+/* ================= toast ================= */
+var toastEl = document.getElementById('toast'), toastTimer = null;
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(function () { toastEl.classList.remove('show'); }, 2600);
+}
+
+/* ================= schematic lab =================
+   Drop any .schem / .nbt / .litematic (Sponge v2 / structure / Litematica, gzipped or raw) and get
+   a full material audit: block census, namespace breakdown, a Create
+   Aeronautics part census and a mass estimate. Parsed client-side. */
+function labClear() {
+  reqClear();
+  var set = function (id, v) { document.getElementById(id).textContent = v; };
+  set('st-blocks', '—'); set('st-interior', '—'); set('st-burners', '—'); set('st-waste', '—'); set('st-eff', '—');
+  set('st-size', '—'); set('st-time', '—');
+  document.getElementById('st-badge').innerHTML = '<span class="badge solid">lab — drop a schematic</span>';
+  state.result = null;
+  if (typeof disposeGroup === 'function' && renderer) { disposeGroup(); needsRender = true; }
+}
+function buildLabPanel() {
+  panel.innerHTML =
+    '<div class="labdrop" id="lab-drop">' +
+      '<b>Drop a .schem, .nbt or .litematic here</b>' +
+      '<span>Sponge v2 / structure files, gzipped or raw — the format this site exports.</span>' +
+      '<span style="font-size:11.5px">click to browse · analyzed entirely in your browser, nothing is uploaded</span>' +
+      '<input type="file" id="lab-file" accept=".schem,.nbt,.litematic" style="display:none">' +
+    '</div>' +
+    '<div class="lab-out" id="lab-out"></div>';
+  var drop = document.getElementById('lab-drop');
+  var file = document.getElementById('lab-file');
+  drop.onclick = function () { file.click(); };
+  file.onchange = function () { if (file.files && file.files[0]) labAnalyze(file.files[0]); };
+  drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', function () { drop.classList.remove('over'); });
+  drop.addEventListener('drop', function (e) {
+    e.preventDefault(); drop.classList.remove('over');
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) labAnalyze(e.dataTransfer.files[0]);
+  });
+}
+function labAnalyze(file) {
+  var out = document.getElementById('lab-out');
+  out.innerHTML = '<p>Reading ' + file.name + '…</p>';
+  file.arrayBuffer().then(function (ab) {
+    return Gen.analyzeSchematic(new Uint8Array(ab));
+  }).then(function (r) {
+    if (!r.ok) { out.innerHTML = '<p class="warn">✘ ' + (r.error || 'unreadable file') + '</p>'; return; }
+    renderLab(r, file.name);
+  }).catch(function (err) {
+    out.innerHTML = '<p class="warn">✘ ' + (err && err.message ? err.message : err) + '</p>';
+  });
+}
+function renderLab(r, name) {
+  var html = '<h3>' + name + (r.gzipped ? ' (gzipped)' : '') + ' — ' + r.total.toLocaleString() + ' blocks, ' + r.size.x + '×' + r.size.y + '×' + r.size.z + '</h3>';
+  var aeroBits = [];
+  if (r.aero.envelope) aeroBits.push(r.aero.envelope + '× envelope');
+  if (r.aero.burner) aeroBits.push(r.aero.burner + '× adjustable burner');
+  if (r.aero.levitite) aeroBits.push(r.aero.levitite + '× levitite');
+  if (r.aero.propeller) aeroBits.push(r.aero.propeller + '× propeller');
+  if (r.aero.bearing) aeroBits.push(r.aero.bearing + '× propeller bearing');
+  if (r.aero.steering) aeroBits.push(r.aero.steering + '× steering wheel');
+  if (r.aero.throttle) aeroBits.push(r.aero.throttle + '× throttle lever');
+  if (r.aero.assembler) aeroBits.push(r.aero.assembler + '× physics assembler');
+  if (aeroBits.length) {
+    html += '<p>Aeronautics census: ' + aeroBits.join(' · ') + '</p>';
+    if (r.aero.burner) html += '<p class="warn">Burner rule: 1 adjustable burner heats 500 blocks of cavity — size that cavity in the Balloon or Crystal tabs.</p>';
+    if (r.aero.assembler) html += '<p>Physics assembler present — this craft can fly as a contraption.</p>';
+  } else {
+    html += '<p>Aeronautics census: no Create Aeronautics blocks found.</p>';
+  }
+  html += '<table><tr><th>Block</th><th class="num">Count</th></tr>';
+  for (var i = 0; i < r.palette.length; i++) {
+    html += '<tr><td><code>' + r.palette[i].name + '</code></td><td class="num">' + r.palette[i].count.toLocaleString() + '</td></tr>';
+  }
+  html += '</table>';
+  html += '<h3>Mass &amp; size</h3><p>Est. craft mass: <b>' + r.mass.toLocaleString() + '</b> mass units (' + r.total.toLocaleString() + ' blocks × ' + r.blockMass + ' + payload ' + r.payload + ') · occupied bbox ' + r.size.x + '×' + r.size.y + '×' + r.size.z + '</p>';
+  var nsBits = [];
+  for (var k in r.namespaces) nsBits.push(k + ': ' + r.namespaces[k]);
+  html += '<h3>Namespaces</h3><p>' + nsBits.join(' · ') + '</p>';
+  html += '<h3>Center of mass</h3><p>COM ' + r.com.x.toFixed(1) + ', ' + r.com.y.toFixed(1) + ', ' + r.com.z.toFixed(1) +
+    ' · middle ' + r.center.x.toFixed(1) + ', ' + r.center.y.toFixed(1) + ', ' + r.center.z.toFixed(1) +
+    ' — <b class="' + (r.comBalanced ? '' : 'warn') + '">' +
+    (r.comBalanced ? '✔ balanced (within a block)' : '✘ off by ' + r.comOffset.x.toFixed(1) + ' X · ' + r.comOffset.y.toFixed(1) + ' Y · ' + r.comOffset.z.toFixed(1) + ' Z') +
+    '</b> · ' + r.comMass.toLocaleString() + ' mass units</p>';
+  /* six-axis balance readout: back/forth, left/right, tilt, pan, yaw */
+  (function () {
+    try {
+      var bent = [];
+      for (var bi = 0; bi < r.blocks.length; bi++) {
+        var blk = r.blocks[bi];
+        var nm = r.palette[blk.state] ? r.palette[blk.state].name : 'minecraft:stone';
+        bent.push({ x: blk.x + 0.5, y: blk.y + 0.5, z: blk.z + 0.5, m: Gen.massOf(nm) });
+      }
+      var brep = Gen.balanceReport(bent, r.center);
+      var bf = function (v) { return (v >= 0 ? '+' : '') + v.toFixed(1); };
+      var vname = function (v) { return v === 'ok' ? 'PERFECTLY STRAIGHT' : (v === 'wonky' ? 'WONKY' : 'UNEVEN'); };
+      html += '<p class="dim" style="font-size:12.5px">Balance — back/forth <b>' + bf(brep.offset.x) + '</b> · left/right <b>' + bf(brep.offset.z) + '</b> · up/down <b>' + bf(brep.offset.y) + '</b> · tilt ' +
+        (brep.offset.z > 0.5 ? 'leans right' : brep.offset.z < -0.5 ? 'leans left' : 'level') +
+        ' · pan ' + (brep.offset.x > 0.5 ? 'nose dips' : brep.offset.x < -0.5 ? 'tail drags' : 'level') +
+        ' · yaw ' + (brep.yawTwist > 0.5 ? 'twists right' : brep.yawTwist < -0.5 ? 'twists left' : 'straight') +
+        ' — <b class="' + (brep.verdict === 'ok' ? '' : 'warn') + '">' + vname(brep.verdict) + '</b>' +
+        (brep.fixes.length ? '<br>Fix: ' + brep.fixes.join(' · ') : '') + '</p>';
+    } catch (e2b) {}
+  })();
+  html += '<p><button class="hbtn" id="lab-view">View in 3D</button> ' +
+    '<button class="hbtn" id="lab-balance">Check inside the Crystal tab</button></p>';
+  document.getElementById('lab-out').innerHTML = html;
+  var lv = document.getElementById('lab-view');
+  if (lv) lv.onclick = function () {
+    state.uploadPalette = r.palette;
+    var model = Gen.blocksToResult(r);
+    renderPreview(model);
+    var set2 = function (id, v) { document.getElementById(id).textContent = v; };
+    set2('st-blocks', r.total.toLocaleString());
+    set2('st-size', r.size.x + '×' + r.size.y + '×' + r.size.z);
+    set2('st-interior', 'COM ' + r.com.x.toFixed(1) + ', ' + r.com.y.toFixed(1) + ', ' + r.com.z.toFixed(1));
+    document.getElementById('st-badge').innerHTML = '<span class="badge ' + (r.comBalanced ? 'exact' : 'miss') + '">' + (r.comBalanced ? '✔ schematic viewer — balanced' : '✘ schematic viewer — COM off-center') + '</span>';
+  };
+  var lb = document.getElementById('lab-balance');
+  if (lb) lb.onclick = function () {
+    state.crystalAudit = r;
+    state.crystalCheck = null;
+    switchTab('crystal');
+  };
+  var set = function (id, v) { document.getElementById(id).textContent = v; };
+  set('st-blocks', r.total.toLocaleString());
+  set('st-interior', r.palette.length + ' materials');
+  set('st-burners', Object.keys(r.namespaces).length + ' namespaces');
+  set('st-waste', r.mass.toLocaleString() + ' mass');
+  set('st-eff', '—');
+  set('st-size', r.size.x + '×' + r.size.y + '×' + r.size.z);
+  set('st-time', 'file');
+  document.getElementById('st-badge').innerHTML = '<span class="badge ' + (r.aero.assembler ? 'exact' : 'solid') + '">' + (r.aero.assembler ? '✔ aeronautics craft' : 'schematic audit') + '</span>';
+  reqClear();
+}
+
+/* ================= ponder-style building guide ================= */
+var guideSteps = [], guideLayer = 0, guideMode = 'steps';
+var guidePlaying = false, guideTimer = null;
+/* pan & zoom for the guide viewport: drag to move, wheel to zoom */
+var guideView = { zoom: 1, ox: 0, oy: 0, dragging: false, px: 0, py: 0 };
+function redrawGuide() {
+  if (guideMode === 'section') renderGuideSection();
+  else renderGuideLayer();
+}
+var shellMap = null, solidSet = null, solidTooBig = false, solidPending = null;
+var AIR_HEX = '#2c4a4a';
+function isBalloonTab() { return state.tab === 'balloon' || state.tab === 'crystal'; }
+/* uploaded schematic blocks: types 100+ index into the parsed palette */
+function uploadName(tp) {
+  var pe = (state.uploadPalette || [])[tp - 100];
+  return pe ? pe.name : 'minecraft:stone';
+}
+/* deterministic material colour from a block id (Create-style viewer) */
+function nameColor(name) {
+  var h = 0;
+  for (var i = 0; i < name.length; i++) h = (Math.imul(h, 31) + name.charCodeAt(i)) >>> 0;
+  var hue = h % 360, s = 0.5, l = 0.55;
+  var c = (1 - Math.abs(2 * l - 1)) * s;
+  var x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+  var m = l - c / 2;
+  var r = 0, g = 0, b = 0;
+  if (hue < 60) { r = c; g = x; }
+  else if (hue < 120) { r = x; g = c; }
+  else if (hue < 180) { g = c; b = x; }
+  else if (hue < 240) { g = x; b = c; }
+  else if (hue < 300) { r = x; b = c; }
+  else { r = c; b = x; }
+  return ((Math.round((r + m) * 255) << 16) | (Math.round((g + m) * 255) << 8) | Math.round((b + m) * 255));
+}
+
+function typeKey(tp, p) {
+  return tp === WOOL ? 'w:' + (p.envelopeColor || p.bladeColor || 'white')
+    : tp === LOG ? 'l:' + (p.frameMaterial === 'andesite_casing' ? 'andesite' : p.frameWoodType)
+    : tp === PLANK ? 'p:' + (p.frameMaterial === 'andesite_casing' ? 'spruce' : p.frameWoodType)
+    : tp === WING ? 'g:wing'
+    : tp === CRYSTAL ? 'x:' + (p.material || 'glass')
+    : tp === INCLUSION ? 'i:' + (p.inclusionMaterial || 'sea_lantern')
+    : tp === AIRBURNER ? 'n:burner'
+    : tp === PROPBEARING ? 'n:bearing'
+    : tp === PROPELLER ? 'n:prop'
+    : tp === STEERWHEEL ? 'n:wheel'
+    : tp === THROTTLE ? 'n:throttle'
+    : tp === ASSEMBLER ? 'n:assembler'
+    : tp >= 100 ? 'u:' + uploadName(tp)
+    : 's:' + (p.bladeColor || 'white');
+}
+function blockColorHex(type, p) {
+  var c;
+  if (type === WOOL) c = WOOL_RGB[p.envelopeColor || 'white'] || WOOL_RGB.white;
+  else if (type === LOG) c = p.frameMaterial === 'andesite_casing' ? ANDESITE_RGB : (LOG_RGB[p.frameWoodType] || LOG_RGB.spruce);
+  else if (type === PLANK) c = PLANK_RGB[p.frameMaterial === 'andesite_casing' ? 'spruce' : (p.frameWoodType || 'spruce')] || PLANK_RGB.spruce;
+  else if (type === WING) c = 0xe8e8e8;
+  else if (type === CRYSTAL) c = CRYSTAL_RGB[p.material] || CRYSTAL_RGB.glass;
+  else if (type === INCLUSION) c = INCLUSION_RGB[p.inclusionMaterial] || INCLUSION_RGB.sea_lantern;
+  else if (type === AIRBURNER) c = 0x8a6a3a;
+  else if (type === PROPBEARING) c = 0x6a7278;
+  else if (type === PROPELLER) c = 0xa89060;
+  else if (type === STEERWHEEL) c = 0xd9b45c;
+  else if (type === THROTTLE) c = 0x8e8e93;
+  else if (type === ASSEMBLER) c = 0x7a8288;
+  else if (type >= 100) c = nameColor(uploadName(type));
+  else c = WOOL_RGB[p.bladeColor || 'white'] || WOOL_RGB.white;
+  return '#' + c.toString(16).padStart(6, '0');
+}
+function guideLabel(key) {
+  var parts = key.split(':');
+  var name = parts[1] || 'white';
+  if (parts[0] === 'w') return name + ' wool';
+  if (parts[0] === 'l') return name === 'andesite' ? 'andesite casing' : name + ' log';
+  if (parts[0] === 'p') return name + ' planks';
+  if (parts[0] === 'g') return 'copycat wing';
+  if (parts[0] === 'x') return name.replace(/_/g, ' ') + ' (crystal hull)';
+  if (parts[0] === 'i') return name.replace(/_/g, ' ') + ' (inclusion)';
+  if (parts[0] === 'u') return name;
+  if (parts[0] === 'n') return { burner: 'adjustable burner', bearing: 'propeller bearing', prop: 'wooden propeller', wheel: 'steering wheel', throttle: 'throttle lever', assembler: 'physics assembler' }[name] || name;
+  return name + ' sail';
+}
+/* fetch the solid cell set (envelope + interior air) for the cut-section view */
+function fetchSolidResult(cb) {
+  if (!workerMode) {
+    solidPending = cb;
+    worker.postMessage({ id: 0, kind: 'solid', solidOf: state.tab === 'crystal' ? 'crystal' : 'balloon', params: Object.assign({}, state.params) });
+  } else {
+    var r = state.tab === 'crystal'
+      ? Gen.genCrystal(Object.assign({}, state.params, { includeSolid: true }))
+      : Gen.genBalloon(Object.assign({}, state.params, { includeSolid: true }));
+    r.kind = 'solid';
+    onSolidResult(r);
+    cb();
+  }
+}
+function onSolidResult(r) {
+  if (!r.solidPositions || !r.solid) {
+    solidSet = null; solidTooBig = true;
+  } else {
+    solidTooBig = false;
+    solidSet = new Set();
+    for (var i = 0; i < r.solid; i++) {
+      solidSet.add(r.solidPositions[i * 3] + ',' + r.solidPositions[i * 3 + 1] + ',' + r.solidPositions[i * 3 + 2]);
+    }
+  }
+  if (solidPending) { var cb = solidPending; solidPending = null; cb(); }
+}
+function stepTextForLayer(r, p, idxs) {
+  var byKey = {};
+  for (var i = 0; i < idxs.length; i++) {
+    var k = typeKey(r.types[idxs[i]], p);
+    byKey[k] = (byKey[k] || 0) + 1;
+  }
+  var parts = [];
+  for (var k2 in byKey) parts.push(byKey[k2] + '× ' + guideLabel(k2));
+  return 'Place ' + parts.join(', ') + '.';
+}
+function openGuide() {
+  var r = state.result;
+  if (!r || !r.count) { toast('Generate something first'); return; }
+  var p = state.params;
+  stopPlay();
+  /* fresh viewport every time the guide opens */
+  guideView.zoom = 1; guideView.ox = 0; guideView.oy = 0;
+  /* structure map for the section view */
+  shellMap = new Map();
+  for (var i = 0; i < r.count; i++) {
+    shellMap.set(r.positions[i * 3] + ',' + r.positions[i * 3 + 1] + ',' + r.positions[i * 3 + 2], r.types[i]);
+  }
+  guideMode = isBalloonTab() ? guideMode : 'steps';
+  /* steps: machines bring their own ponder sequence; shapes get layer steps */
+  if (r.steps && r.steps.length) {
+    guideSteps = r.steps;
+  } else {
+    var byY = {};
+    for (var i2 = 0; i2 < r.count; i2++) {
+      var y = r.positions[i2 * 3 + 1];
+      (byY[y] = byY[y] || []).push(i2);
+    }
+    var ys = Object.keys(byY).map(Number).sort(function (a, b) { return a - b; });
+    guideSteps = [];
+    for (var ly = 0; ly < ys.length; ly++) {
+      var idxs = byY[ys[ly]];
+      guideSteps.push({ text: stepTextForLayer(r, p, idxs), blocks: idxs });
+    }
+  }
+  guideLayer = Math.min(guideLayer, (guideMode === 'section' ? (r.maxX - r.minX) : guideSteps.length - 1));
+  /* materials legend */
+  var legend = document.getElementById('guide-legend');
+  legend.innerHTML = '';
+  var seen = {};
+  for (var j = 0; j < r.count; j++) {
+    var tp = r.types[j];
+    var key = typeKey(tp, p);
+    if (seen[key]) continue;
+    seen[key] = 1;
+    var sw = document.createElement('span');
+    sw.innerHTML = '<i style="background:' + blockColorHex(tp, p) + '"></i> ' + guideLabel(key);
+    legend.appendChild(sw);
+  }
+  if (isBalloonTab()) {
+    var air = document.createElement('span');
+    air.innerHTML = '<i style="background:' + AIR_HEX + '"></i> interior air (volume)';
+    legend.appendChild(air);
+  }
+  /* layer-state legend: place now / previous layer / stacking on previous */
+  var curSw = document.createElement('span');
+  curSw.innerHTML = '<i style="background:#ffb347"></i> place now';
+  legend.appendChild(curSw);
+  var prevSw = document.createElement('span');
+  prevSw.innerHTML = '<i style="background:#6f7680"></i> previous layer (dimmed)';
+  legend.appendChild(prevSw);
+  var stackSw = document.createElement('span');
+  stackSw.innerHTML = '<i style="background:#7ef29b"></i> stacks on the previous layer';
+  legend.appendChild(stackSw);
+  document.getElementById('guide-modal').classList.remove('hidden');
+  var secBtn = document.getElementById('guide-mode-section');
+  secBtn.style.display = isBalloonTab() ? '' : 'none';
+  document.getElementById('guide-mode-layers').classList.toggle('active', guideMode !== 'section');
+  secBtn.classList.toggle('active', guideMode === 'section');
+  /* summary line */
+  var gs = document.getElementById('guide-stats-line');
+  if (state.tab === 'balloon' && r.hollow && r.interior > 0) {
+    var gb = Math.ceil(r.interior / 500);
+    var ge = r.interior / Math.max(1, r.count);
+    gs.textContent = 'Interior: ' + r.interior.toLocaleString() + ' blocks · Burners: ' + gb + ' (' + (gb * 500).toLocaleString() + ' covered) · Envelope: ' + r.count.toLocaleString() + ' blocks · ' + ge.toFixed(2) + ' vol/wool' + (r.interior % 500 === 0 ? ' · EXACT ✔' : '');
+  } else if (state.tab === 'balloon') {
+    gs.textContent = 'Solid balloon — ' + r.count.toLocaleString() + ' blocks';
+  } else if (state.tab === 'wings') {
+    gs.textContent = 'Place ' + (p.wingBlock || 'copycat_wing') + ' blocks along the drawn grid — flat 1-block-thick panels from Create Propulsion: Simulated.';
+  } else if (state.tab === 'crystal') {
+    gs.textContent = 'A double-terminated crystal shard — a point at both ends, ' + r.interior.toLocaleString() + ' blocks of cavity for your interior, ' + r.burners + ' burner' + (r.burners > 1 ? 's' : '') + ', seeded imperfections (' + r.cracksMade + ' crack' + (r.cracksMade > 1 ? 's' : '') + ', ' + r.inclusionTotal + ' inclusion' + (r.inclusionTotal > 1 ? 's' : '') + ').';
+  } else if (state.tab === 'shapes') {
+    gs.textContent = 'A ' + r.kind + ' — ' + r.count.toLocaleString() + ' blocks of ' + p.material + ', ' + r.interior.toLocaleString() + ' interior blocks. Export and build it anywhere.';
+  } else {
+    gs.textContent = 'Propeller — ' + r.count.toLocaleString() + ' blocks';
+  }
+  updateGuideControls();
+  if (isBalloonTab()) {
+    /* solid data for the cut-section view (async in worker mode) */
+    fetchSolidResult(function () {
+      if (guideMode === 'section') { updateGuideControls(); renderGuideSection(); }
+    });
+  }
+  if (guideMode === 'section') renderGuideSection(); else renderGuideLayer();
+}
+function updateGuideControls() {
+  var r = state.result;
+  var n = guideMode === 'section' && r ? (r.maxX - r.minX + 1) : guideSteps.length;
+  var info = document.getElementById('guide-layer-info');
+  var cnt = document.getElementById('guide-layer-count');
+  if (guideMode === 'section' && r) {
+    var plane = r.minX + guideLayer;
+    info.textContent = 'Cut at X = ' + plane + ' · plane ' + (guideLayer + 1) + ' of ' + n;
+    cnt.textContent = 'envelope + interior air';
+  } else {
+    info.textContent = 'Step ' + (guideLayer + 1) + ' of ' + n;
+    cnt.textContent = guideSteps[guideLayer].blocks.length.toLocaleString() + ' blocks to place now';
+  }
+  var slider = document.getElementById('guide-slider');
+  slider.max = n - 1;
+  slider.value = guideLayer;
+  document.getElementById('guide-prev').disabled = guideLayer === 0;
+  document.getElementById('guide-next').disabled = guideLayer >= n - 1;
+}
+/* cumulative top-down view with a slight vertical offset per layer — a cheap
+   oblique projection so stacked blocks stay readable, ponder-style */
+function renderGuideLayer() {
+  if (!guideSteps.length) return;
+  var r = state.result, p = state.params;
+  var canvas = document.getElementById('guide-canvas');
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  ctx.fillStyle = '#141517';
+  ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  ctx.translate(guideView.ox, guideView.oy);
+  ctx.scale(guideView.zoom, guideView.zoom);
+  var minX = r.minX, maxX = r.maxX, minZ = r.minZ, maxZ = r.maxZ;
+  var w = maxX - minX + 1, h = maxZ - minZ + 1;
+  var cell = Math.floor(Math.min((W - 44) / w, (H - 44) / h));
+  cell = Math.min(cell, 24);
+  var ox = (W - cell * w) / 2, oy = (H - cell * h) / 2;
+  if (cell < 4) {
+    ctx.fillStyle = '#9aa3a3';
+    ctx.font = '14px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Step too large to display as a grid', W / 2, H / 2);
+    ctx.restore();
+    return;
+  }
+  function cellXY(x, y, z) {
+    /* flat top-down view: every column shows exactly ONE block, so stacked
+       layers can never overlap on screen */
+    return [ox + (x - minX) * cell + 1, oy + (z - minZ) * cell + 1];
+  }
+  /* base grid */
+  ctx.strokeStyle = '#26292b';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (var gx = 0; gx <= w; gx++) { ctx.moveTo(ox + gx * cell, oy); ctx.lineTo(ox + gx * cell, oy + h * cell); }
+  for (var gz = 0; gz <= h; gz++) { ctx.moveTo(ox, oy + gz * cell); ctx.lineTo(ox + w * cell, oy + gz * cell); }
+  ctx.stroke();
+  /* ONLY the previous layer is shown (dimmed, off-color) — the guide is
+     layer-by-layer, not cumulative. The current layer is the accent; where
+     a current block stacks directly on a previous-layer block (same XZ
+     column), it gets a third "overlap" colour. */
+  var prevCol = {}, curCol = {};
+  if (guideLayer > 0) {
+    var pbl = guideSteps[guideLayer - 1].blocks;
+    for (var pi = 0; pi < pbl.length; pi++) {
+      var pbi = pbl[pi];
+      prevCol[r.positions[pbi * 3] + ',' + r.positions[pbi * 3 + 2]] = pbi;
+    }
+  }
+  var cbl = guideSteps[guideLayer].blocks;
+  for (var ci = 0; ci < cbl.length; ci++) {
+    var cbi = cbl[ci];
+    curCol[r.positions[cbi * 3] + ',' + r.positions[cbi * 3 + 2]] = cbi;
+  }
+  /* previous layer, dimmed — but only the columns the current layer does
+     NOT cover (a covered column renders as one solid block, never two) */
+  var prevList = [];
+  for (var pk in prevCol) if (!curCol[pk]) prevList.push(prevCol[pk]);
+  prevList.sort(function (a, b) { return r.positions[a * 3 + 1] - r.positions[b * 3 + 1]; });
+  ctx.globalAlpha = 0.55;
+  for (var q = 0; q < prevList.length; q++) {
+    var bi2 = prevList[q];
+    var cxy = cellXY(r.positions[bi2 * 3], r.positions[bi2 * 3 + 1], r.positions[bi2 * 3 + 2]);
+    ctx.fillStyle = blockColorHex(r.types[bi2], p);
+    ctx.fillRect(cxy[0], cxy[1], cell - 2, cell - 2);
+    ctx.strokeStyle = 'rgba(0, 0, 0, .35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cxy[0] + .5, cxy[1] + .5, cell - 3, cell - 3);
+  }
+  ctx.globalAlpha = 1;
+  /* current layer: accent fill + outline; blocks that stack on a
+     previous-layer block get the green overlap colour */
+  var cur = cbl.slice();
+  cur.sort(function (a, b) { return r.positions[a * 3 + 1] - r.positions[b * 3 + 1]; });
+  for (var j = 0; j < cur.length; j++) {
+    var bj = cur[j];
+    var cxy2 = cellXY(r.positions[bj * 3], r.positions[bj * 3 + 1], r.positions[bj * 3 + 2]);
+    var stacks = prevCol[r.positions[bj * 3] + ',' + r.positions[bj * 3 + 2]] !== undefined;
+    ctx.fillStyle = stacks ? '#7ef29b' : '#ffb347';
+    ctx.fillRect(cxy2[0], cxy2[1], cell - 2, cell - 2);
+    ctx.strokeStyle = stacks ? '#d8ffe4' : '#ffe3b8';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cxy2[0] + 1.5, cxy2[1] + 1.5, cell - 5, cell - 5);
+    ctx.lineWidth = 1;
+  }
+  /* axis labels */
+  ctx.fillStyle = '#9aa3a3';
+  ctx.font = '10px system-ui';
+  ctx.textAlign = 'center';
+  for (var lx = 0; lx < w; lx += Math.max(1, Math.floor(w / 10))) {
+    ctx.fillText(String(minX + lx), ox + (lx + .5) * cell, H - 8);
+  }
+  ctx.textAlign = 'right';
+  for (var lz = 0; lz < h; lz += Math.max(1, Math.floor(h / 10))) {
+    ctx.fillText(String(minZ + lz), 6, oy + (lz + .5) * cell + 3);
+  }
+  document.getElementById('guide-text').textContent = (guideLayer + 1) + '. ' + guideSteps[guideLayer].text;
+  ctx.restore();
+}
+function stopPlay() {
+  guidePlaying = false;
+  if (guideTimer) { clearInterval(guideTimer); guideTimer = null; }
+  var pb = document.getElementById('guide-play');
+  if (pb) pb.textContent = '▶ Play';
+}
+/* vertical cut through the balloon at a chosen X plane:
+   shows the envelope (material colors) and the interior air (dim teal) */
+function renderGuideSection() {
+  var r = state.result;
+  if (!r || !isBalloonTab()) return;
+  var canvas = document.getElementById('guide-canvas');
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, H = canvas.height;
+  ctx.fillStyle = '#262929';
+  ctx.fillRect(0, 0, W, H);
+  ctx.save();
+  ctx.translate(guideView.ox, guideView.oy);
+  ctx.scale(guideView.zoom, guideView.zoom);
+  if (solidTooBig) {
+    ctx.fillStyle = '#9aa3a3';
+    ctx.font = '14px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Section view unavailable for very large models', W / 2, H / 2);
+    ctx.restore();
+    return;
+  }
+  var plane = r.minX + guideLayer;
+  var zc = r.maxZ - r.minZ + 1, yc = r.maxY - r.minY + 1;
+  var cell = Math.floor(Math.min((W - 44) / zc, (H - 44) / yc));
+  cell = Math.min(cell, 24);
+  var ox = (W - cell * zc) / 2, oy = (H - cell * yc) / 2;
+  if (cell < 4) {
+    ctx.fillStyle = '#9aa3a3';
+    ctx.font = '14px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('Cut section too large to display as a grid', W / 2, H / 2);
+    ctx.restore();
+    return;
+  }
+  ctx.strokeStyle = '#3a3e3e';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (var gz = 0; gz <= zc; gz++) { ctx.moveTo(ox + gz * cell, oy); ctx.lineTo(ox + gz * cell, oy + yc * cell); }
+  for (var gy = 0; gy <= yc; gy++) { ctx.moveTo(ox, oy + gy * cell); ctx.lineTo(ox + zc * cell, oy + gy * cell); }
+  ctx.stroke();
+  for (var y = r.minY; y <= r.maxY; y++) {
+    for (var z = r.minZ; z <= r.maxZ; z++) {
+      var key = plane + ',' + y + ',' + z;
+      var t = shellMap ? shellMap.get(key) : undefined;
+      if (t) ctx.fillStyle = blockColorHex(t, state.params);
+      else if (solidSet && solidSet.has(key)) ctx.fillStyle = AIR_HEX;
+      else continue;
+      /* y up: higher y = higher on the canvas */
+      ctx.fillRect(ox + (z - r.minZ) * cell + 1, oy + (yc - 1 - (y - r.minY)) * cell + 1, cell - 2, cell - 2);
+    }
+  }
+  ctx.fillStyle = '#9aa3a3';
+  ctx.font = '10px system-ui';
+  ctx.textAlign = 'center';
+  for (var lz = 0; lz < zc; lz += Math.max(1, Math.floor(zc / 10))) {
+    ctx.fillText(String(r.minZ + lz), ox + (lz + .5) * cell, H - 8);
+  }
+  ctx.textAlign = 'right';
+  for (var ly = 0; ly < yc; ly += Math.max(1, Math.floor(yc / 10))) {
+    ctx.fillText(String(r.minY + ly), 6, oy + (ly + .5) * cell + 3);
+  }
+  ctx.restore();
+}
+function guideStep(dir) {
+  var r = state.result;
+  if (guideMode === 'section' && r) {
+    guideLayer = Math.max(0, Math.min(r.maxX - r.minX, guideLayer + dir));
+    updateGuideControls();
+    renderGuideSection();
+  } else {
+    guideLayer = Math.max(0, Math.min(guideSteps.length - 1, guideLayer + dir));
+    updateGuideControls();
+    renderGuideLayer();
+  }
+}
+document.getElementById('guide-btn').onclick = openGuide;
+document.getElementById('guide-close').onclick = function () {
+  stopPlay();
+  document.getElementById('guide-modal').classList.add('hidden');
+};
+document.getElementById('guide-play').onclick = function () {
+  if (guidePlaying) { stopPlay(); return; }
+  if (guideMode !== 'steps') return;
+  if (guideLayer >= guideSteps.length - 1) { guideLayer = -1; }
+  guidePlaying = true;
+  this.textContent = '⏸ Pause';
+  guideTimer = setInterval(function () {
+    if (guideLayer >= guideSteps.length - 1) { stopPlay(); return; }
+    guideStep(1);
+  }, 1600);
+};
+document.getElementById('guide-mode-layers').onclick = function () {
+  stopPlay();
+  guideMode = 'steps';
+  guideLayer = Math.min(guideLayer, guideSteps.length - 1);
+  this.classList.add('active');
+  document.getElementById('guide-mode-section').classList.remove('active');
+  updateGuideControls();
+  renderGuideLayer();
+};
+document.getElementById('guide-mode-section').onclick = function () {
+  if (!state.result || !isBalloonTab()) return;
+  stopPlay();
+  guideMode = 'section';
+  guideLayer = Math.min(guideLayer, state.result.maxX - state.result.minX);
+  this.classList.add('active');
+  document.getElementById('guide-mode-layers').classList.remove('active');
+  updateGuideControls();
+  if (solidSet || solidTooBig) renderGuideSection();
+  else fetchSolidResult(function () { updateGuideControls(); renderGuideSection(); });
+};
+/* pan & zoom the guide viewport: drag to move the image, wheel to zoom in/out */
+(function bindGuidePanZoom() {
+  var gc = document.getElementById('guide-canvas');
+  if (!gc) return;
+  gc.style.cursor = 'grab';
+  gc.style.touchAction = 'none';
+  gc.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var rect = gc.getBoundingClientRect();
+    var cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+    var nz = Math.min(6, Math.max(0.35, guideView.zoom * Math.exp(-e.deltaY * 0.0012)));
+    guideView.ox = cx - (cx - guideView.ox) * (nz / guideView.zoom);
+    guideView.oy = cy - (cy - guideView.oy) * (nz / guideView.zoom);
+    guideView.zoom = nz;
+    redrawGuide();
+  }, { passive: false });
+  gc.addEventListener('pointerdown', function (e) {
+    guideView.dragging = true;
+    guideView.px = e.clientX; guideView.py = e.clientY;
+    try { gc.setPointerCapture(e.pointerId); } catch (err) {}
+    gc.style.cursor = 'grabbing';
+  });
+  gc.addEventListener('pointermove', function (e) {
+    if (!guideView.dragging) return;
+    guideView.ox += e.clientX - guideView.px;
+    guideView.oy += e.clientY - guideView.py;
+    guideView.px = e.clientX; guideView.py = e.clientY;
+    redrawGuide();
+  });
+  var endDrag = function () {
+    guideView.dragging = false;
+    gc.style.cursor = 'grab';
+  };
+  gc.addEventListener('pointerup', endDrag);
+  gc.addEventListener('pointercancel', endDrag);
+})();
+document.getElementById('guide-prev').onclick = function () { guideStep(-1); };
+document.getElementById('guide-next').onclick = function () { guideStep(1); };
+document.getElementById('guide-slider').oninput = function () {
+  guideLayer = parseInt(this.value, 10);
+  updateGuideControls();
+  if (guideMode === 'section') renderGuideSection(); else renderGuideLayer();
+};
+
+/* ================= boot ================= */
+function onResize() {
+  var w = viewport.clientWidth, h = viewport.clientHeight;
+  if (!w || !h) return;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  if (renderer) renderer.setSize(w, h);
+  needsRender = true;
+}
+window.addEventListener('resize', onResize);
+window.addEventListener('load', onResize);
+initEngine(function () {
+  buildPanel();
+  applyHash();
+  requestGen(true);
+  onResize();
+  setTimeout(onResize, 150);   /* catch late layout (fonts etc.) */
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aero-Dynamics — Ponder Handbook (Create Aeronautics)</title>
+<style>  :root {
+    color-scheme: dark;
+    --bg: #0b0c0f; --panel: rgba(28, 30, 34, .72); --panel2: rgba(38, 41, 46, .92);
+    --line: rgba(255, 255, 255, .08); --line2: rgba(255, 255, 255, .14);
+    --txt: #f5f5f7; --dim: #8e8e93; --faint: #636366;
+    --acc: #0a84ff; --acc-soft: rgba(10, 132, 255, .14);
+    --ok: #30d158; --ok-soft: rgba(48, 209, 88, .14);
+    --bad: #ff453a; --bad-soft: rgba(255, 69, 58, .14);
+    --amber: #e8c98a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--txt);
+    font: 15px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: .01em; -webkit-font-smoothing: antialiased;
+    min-height: 100vh; display: flex; flex-direction: column;
+  }
+  ::selection { background: rgba(10, 132, 255, .35); }
+  header {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    background: rgba(28, 30, 34, .66); backdrop-filter: blur(24px) saturate(1.6); -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 10;
+  }
+  header .brand { display: flex; align-items: center; gap: 9px; text-decoration: none; color: var(--txt); }
+  header .brand .mark {
+    width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center;
+    background: var(--acc-soft); border: 1px solid rgba(10, 132, 255, .35);
+    font-size: 14px; color: #7ab8f5;
+  }
+  header .brand b { font-size: 15px; font-weight: 650; letter-spacing: -.01em; }
+  header .brand small { color: var(--faint); font-weight: 400; font-size: 12.5px; }
+  .spacer { flex: 1; }
+  .hbtn {
+    background: rgba(255, 255, 255, .06); color: var(--txt);
+    border: 1px solid var(--line2); padding: 5px 13px; border-radius: 8px;
+    cursor: pointer; font-size: 13px; font-weight: 500; text-decoration: none; white-space: nowrap;
+    transition: background .18s ease;
+  }
+  .hbtn:hover { background: rgba(255, 255, 255, .1); }
+  .hbtn.primary { background: var(--acc); border-color: transparent; color: #fff; }
+  .hbtn.primary:hover { background: #2993ff; }
+  main { flex: 1; width: 100%; max-width: 1060px; margin: 0 auto; padding: 26px 22px 70px; }
+  .hidden { display: none !important; }
+  code {
+    background: rgba(255, 255, 255, .06); border: 1px solid var(--line); border-radius: 5px;
+    padding: 1px 6px; font-size: 13px; font-family: ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
+    color: var(--amber);
+  }
+  .golink {
+    display: inline-flex; align-items: center; gap: 6px; margin: 4px 6px 4px 0; padding: 6px 14px; border-radius: 9px;
+    background: var(--acc-soft); border: 1px solid rgba(10, 132, 255, .3); color: #7ab8f5;
+    text-decoration: none; font-size: 13px; font-weight: 550; transition: background .18s ease;
+  }
+  .golink:hover { background: rgba(10, 132, 255, .24); }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .14); border-radius: 5px; border: 2px solid transparent; background-clip: content-box; }
+
+  /* ================= ponder index ================= */
+  .index-hero { margin-bottom: 26px; }
+  .index-hero h1 { font-size: 30px; font-weight: 680; letter-spacing: -.025em; margin-bottom: 6px; }
+  .index-hero p { color: var(--dim); max-width: 660px; }
+  .quick { margin: 14px 0 26px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+  .quick .qlabel { color: var(--faint); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; margin-right: 6px; }
+  .scene-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .scene-card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px;
+    cursor: pointer; transition: border-color .18s ease, background .18s ease, transform .18s ease;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .scene-card:hover { border-color: rgba(255, 255, 255, .22); background: rgba(38, 41, 46, .8); transform: translateY(-1px); }
+  .scene-card .icon {
+    width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center;
+    background: var(--acc-soft); border: 1px solid rgba(10, 132, 255, .3); font-size: 20px;
+  }
+  .scene-card h3 { font-size: 15.5px; font-weight: 620; letter-spacing: -.01em; }
+  .scene-card p { color: var(--dim); font-size: 12.8px; line-height: 1.45; flex: 1; }
+  .scene-card .meta { color: var(--faint); font-size: 11.5px; display: flex; align-items: center; gap: 8px; }
+  .scene-card .meta .start { color: #7ab8f5; font-weight: 600; }
+
+  /* ================= ponder scene player ================= */
+  .player { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: stretch; }
+  @media (max-width: 860px) { .player { grid-template-columns: 1fr; } }
+  .narr {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px;
+    display: flex; flex-direction: column; min-height: 440px;
+  }
+  .narr .kicker { color: var(--acc); font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 8px; }
+  .narr h2 { font-size: 22px; font-weight: 660; letter-spacing: -.02em; }
+  .stepbar { display: flex; gap: 4px; margin: 16px 0 18px; }
+  .stepbar .seg { flex: 1; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, .1); cursor: pointer; transition: background .2s ease; }
+  .stepbar .seg.done { background: var(--acc); }
+  .stepbar .seg.cur { background: #7ab8f5; }
+  .narr h3 { font-size: 16.5px; font-weight: 640; letter-spacing: -.01em; margin-bottom: 8px; }
+  .narr .stepnum { color: var(--faint); font-weight: 500; font-size: 13px; margin-right: 6px; }
+  .narr .text { color: #d6d6da; flex: 1; }
+  .narr .text p { margin-bottom: 9px; }
+  .narr .text ul, .narr .text ol { margin: 0 0 10px 22px; }
+  .narr .text li { margin-bottom: 4px; }
+  .narr .text table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; font-size: 12.8px; }
+  .narr .text th, .narr .text td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; vertical-align: top; }
+  .narr .text th { background: rgba(255, 255, 255, .05); color: #e8ecec; font-weight: 600; }
+  .narr .text tr:nth-child(even) td { background: rgba(255, 255, 255, .015); }
+  .formula {
+    background: rgba(255, 255, 255, .04); border: 1px solid var(--line); border-radius: 10px;
+    padding: 9px 13px; margin: 8px 0; font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 13px; color: var(--amber); overflow-x: auto;
+  }
+  .note { border-radius: 10px; padding: 9px 13px; margin: 8px 0; font-size: 13px; }
+  .note.good { background: var(--ok-soft); border: 1px solid rgba(48, 209, 88, .3); color: #c7eccf; }
+  .note.warn { background: var(--bad-soft); border: 1px solid rgba(255, 69, 58, .3); color: #f3c4c1; }
+  .note.tip { background: var(--acc-soft); border: 1px solid rgba(10, 132, 255, .3); color: #a9cdf2; }
+  .keyparts { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+  .keyparts .klabel { color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em; font-weight: 700; margin-bottom: 7px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip {
+    background: rgba(255, 255, 255, .05); border: 1px solid var(--line); color: #cfcfd4;
+    border-radius: 6px; padding: 2px 8px; font-size: 12px; font-family: ui-monospace, "SF Mono", Consolas, monospace;
+  }
+  .tryrow { margin-top: 14px; }
+  .tryrow .tlabel { color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em; font-weight: 700; margin-bottom: 7px; }
+  .world {
+    background: radial-gradient(120% 90% at 30% 20%, #1b2330 0%, #10141b 55%, #0b0c0f 100%);
+    border: 1px solid var(--line); border-radius: 16px; padding: 18px;
+    display: flex; flex-direction: column; min-height: 440px;
+  }
+  .world .wlabel { color: var(--faint); font-size: 10.5px; text-transform: uppercase; letter-spacing: .09em; font-weight: 700; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .world .wlabel .wtag { background: rgba(255, 255, 255, .06); border: 1px solid var(--line); padding: 2px 8px; border-radius: 6px; color: var(--dim); }
+  .stage { flex: 1; display: grid; place-items: center; overflow: hidden; }
+  .stage .diagram { display: grid; gap: 2px; padding: 4px; background: rgba(255, 255, 255, .02); border-radius: 10px; }
+  .stage .cell { width: 15px; height: 15px; border-radius: 2.5px; position: relative; }
+  .stage .cell.f { background: rgba(255, 255, 255, .028); }
+  .stage .legend { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px 14px; justify-content: center; }
+  .stage .legend span { display: inline-flex; align-items: center; gap: 6px; color: var(--dim); font-size: 12px; }
+  .stage .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .world .cap { color: var(--dim); font-size: 12.5px; margin-top: 10px; text-align: center; }
+
+  /* controls */
+  .controls {
+    margin-top: 14px; display: flex; align-items: center; gap: 8px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px;
+  }
+  .controls .spacer2 { flex: 1; }
+  .cbtn {
+    background: rgba(255, 255, 255, .06); color: var(--txt); border: 1px solid var(--line2);
+    padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500;
+    transition: background .18s ease;
+  }
+  .cbtn:hover { background: rgba(255, 255, 255, .1); }
+  .cbtn.primary { background: var(--acc); border-color: transparent; color: #fff; }
+  .cbtn.primary:hover { background: #2993ff; }
+  .cbtn:disabled { opacity: .35; cursor: default; }
+  .counter { color: var(--dim); font-size: 13px; min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<header>
+  <a class="brand" href="wiki.html">
+    <span class="mark">&#9971;</span>
+    <span><b>Ponder</b> <small>&middot; Aero-Dynamics handbook</small></span>
+  </a>
+  <div class="spacer"></div>
+  <a class="hbtn" id="hdr-index" href="wiki.html">Index</a>
+  <a class="hbtn" href="index.html">&larr; Back to studio</a>
+</header>
+
+<main id="view-index">
+  <div class="index-hero">
+    <h1>Ponder &mdash; the hands-on handbook</h1>
+    <p>Create&rsquo;s Ponder mechanic, for airships: every scene is a short guided build &mdash; a step-by-step narration,
+    the exact blocks you touch, and a button that drops you into the studio to generate the real schematic.
+    All physics values come from the mod jars in this pack. Nothing is guessed.</p>
+  </div>
+  <div class="quick">
+    <span class="qlabel">Jump straight in</span>
+    <a class="golink" href="index.html#YjM">&#9654; Balloon tab</a>
+    <a class="golink" href="index.html#cDM">&#9654; Propeller tab</a>
+    <a class="golink" href="index.html#YzU">&#9654; Crystal shard tab</a>
+  </div>
+  <div class="scene-grid" id="scene-grid"></div>
+</main>
+
+<main id="view-scene" class="hidden">
+  <div class="player">
+    <div class="narr">
+      <div class="kicker" id="sc-kicker"></div>
+      <h2 id="sc-title"></h2>
+      <div class="stepbar" id="stepbar"></div>
+      <h3 id="st-title"></h3>
+      <div class="text" id="st-text"></div>
+      <div class="keyparts" id="st-parts"><div class="klabel">Key blocks</div><div class="chips" id="st-chips"></div></div>
+      <div class="tryrow" id="st-try"><div class="tlabel">Try it in the studio</div><div id="st-links"></div></div>
+    </div>
+    <div class="world">
+      <div class="wlabel"><span>SCENE</span><span class="wtag" id="sc-tag"></span></div>
+      <div class="stage" id="st-stage"></div>
+      <div class="cap" id="st-cap"></div>
+    </div>
+  </div>
+  <div class="controls">
+    <button class="cbtn" id="btn-index">Index</button>
+    <button class="cbtn" id="btn-prev" title="Previous step">&#9664; Back</button>
+    <button class="cbtn primary" id="btn-play" title="Auto-play steps">&#9654; Play</button>
+    <span class="counter" id="st-counter">1 / 1</span>
+    <button class="cbtn" id="btn-next" title="Next step">Next &#9654;</button>
+    <div class="spacer2"></div>
+    <button class="cbtn" id="btn-reset" title="Restart scene">&#8635;</button>
+  </div>
+  <div id="complete-banner"></div>
+</main>
+<script>
+'use strict';
+/* ================= ponder scenes =================
+   Diagram rows are ASCII art: '.' = empty cell, letters map to colors in
+   each diagram's `map`. Each scene is a Ponder scene: narration steps,
+   key blocks, an in-world diagram and a studio deep-link. */
+
+var C = {
+  faint: '#4a4d52',
+  envelope: '#7ab8f5', heat: '#d98e4a', flame: '#ffb84a', basket: '#9a6b4a',
+  wool: '#b9b09a', hub: '#6a7278', shaft: '#8e8e93', amethyst: '#9b6ff0',
+  glass: '#8fb6d9', hull: '#7a8288', boiler: '#b0703a', steam: '#cfe8ff',
+  thruster: '#ff9f5a', levitite: '#dfe8ff', sensor: '#7ae8c8', rope: '#c8b48a',
+  water: '#4a90d9', wood: '#8a6a3a', redstone: '#ff5a5a', assembler: '#8a93a0',
+  control: '#d9b45c', air: '#3a5a7a', glow: '#c9f26b', burner: '#b8794a'
+};
+
+var SCENES = [
+{
+  id: 'workshop', icon: '&#129513;', title: 'The Workshop', tag: 'start here',
+  blurb: 'What this pack is, the three questions every craft answers, and where the studio fits in.',
+  steps: [
+    { t: 'Welcome to the workshop',
+      n: '<p>This pack is built around <b>Create</b> (kinetic machines), <b>Create Aeronautics</b> (physics vehicles &mdash; airships, planes, cars, hovercraft) and <b>Sable</b> (the physics engine that makes them move).</p><p>Your vehicles are <b>real physics objects</b>: weight, lift, thrust and balance all matter. This handbook walks the whole journey &mdash; the physics, the parts, complete example craft, and the math to size your own.</p>',
+      parts: ['create:*', 'aeronautics:*', 'simulated:*', 'sable physics'],
+      d: { rows: [
+        '....GGGGGGGGGGGG....',
+        '...GGGGGGGGGGGGGG...',
+        '..GGGGGGGGGGGGGGGG..',
+        '.GGGGGGGGGGGGGGGGGG.',
+        'GGGGGGGGGGGGGGGGGGGG',
+        'GGGGGGGGGGGGGGGGGGGG',
+        '.GGGGGGGGGGGGGGGGGG.',
+        '..WW....GGGG....WW..',
+        '..WW....GGGG....WW..',
+        '......HHHHHHHH......',
+        '.....BBBBBBBBBB.....',
+        '.....B..BBBB..B.....'
+      ], map: { G: [C.envelope, 'envelope'], W: [C.wool, 'propeller'], H: [C.heat, 'heat'], B: [C.basket, 'gondola'] },
+        legend: [[C.envelope, 'envelope'], [C.wool, 'propeller'], [C.heat, 'heat'], [C.basket, 'gondola']],
+        cap: 'An assembled airship: envelope up top, drive at the sides, gondola hanging below.' },
+      links: [] },
+    { t: 'The three questions',
+      n: '<p>Every craft you build answers the same three questions. Ask them in order &mdash; a ship that lifts but can&rsquo;t steer is a kite.</p><ol><li><b>Does it lift?</b> Hot air, steam, levitite &mdash; or thrust. (Lift + Math scenes)</li><li><b>Does it move?</b> Propellers, thrusters, wheels &mdash; and how much force they make. (Thrust scene)</li><li><b>Can you steer it?</b> Steering wheels, throttle levers, sensors, docking. (Steering scene)</li></ol>',
+      parts: ['simulated:steering_wheel', 'simulated:throttle_lever', 'aeronautics:adjustable_burner'],
+      d: { rows: [
+        '..Q..Q..Q.',
+        '..G..W..S.',
+        '..G..WW.S.',
+        '..G.WWW.S.',
+        '..G..WW.S.',
+        '..G..W..S.'
+      ], map: { Q: [C.faint, 'question'], G: [C.envelope, 'lift'], W: [C.wool, 'move'], S: [C.control, 'steer'] },
+        legend: [[C.envelope, 'lift'], [C.wool, 'move'], [C.control, 'steer']],
+        cap: 'Lift, move, steer &mdash; size all three before you assemble.' },
+      links: [] },
+    { t: 'Meet the studio',
+      n: '<p>The studio (<code>index.html</code>) produces block-perfect schematics and the live math for each shape:</p><ul><li><b>Balloon</b> &mdash; hot-air envelopes (the real balloonshaper profile), ribs, keel, fins, with lift/burner math built in.</li><li><b>Propeller</b> &mdash; 2&ndash;12 blade props, swept/curved, wool or sail, with swept-disc math.</li><li><b>Wings</b> &mdash; copycat-wing planforms (tapered / delta, swept, mirrored).</li><li><b>Crystal</b> &mdash; rhombus crystal shards, Blade &amp; Sorcery style, flight-tested presets.</li><li><b>Shapes</b> &mdash; sphere, ellipsoid, cylinder, cone, pyramid, torus, dome.</li><li><b>Lab</b> &mdash; drop in any <code>.schem</code> / <code>.nbt</code> / <code>.litematic</code>: census, mass, part list, center-of-mass report.</li></ul>',
+      parts: ['index.html', 'balloon', 'propeller', 'wings', 'crystal', 'shapes', 'lab'],
+      d: { rows: [
+        'GGGG..WWW..CCC',
+        'GGGG..WWW..CCC',
+        'GGGG..WWW..CCC',
+        'GGGG..WWW..CCC',
+        '....HHHHH..CCC',
+        '....HHHHH..CCC',
+        '....HHHHH..CCC',
+        '....HHHHH..CCC'
+      ], map: { G: [C.envelope, 'balloon'], W: [C.wool, 'propeller'], C: [C.amethyst, 'crystal'], H: [C.hull, 'shapes + lab'] },
+        legend: [[C.envelope, 'balloon'], [C.wool, 'propeller'], [C.amethyst, 'crystal'], [C.hull, 'shapes &amp; lab']],
+        cap: 'Six studio tabs, one per shape family.' },
+      links: [] },
+    { t: 'Make something',
+      n: '<p>Enough talking &mdash; open the studio and generate your first envelope. Watch the requirements bar: burners, lift, mass and net lift update live as you drag the sliders.</p><p>Everything in this handbook was pulled from the actual mod jars and source code in your pack &mdash; the numbers you see in the studio are the numbers the mod uses.</p>',
+      parts: ['index.html', 'aeronautics:*_envelope'],
+      d: { rows: [
+        '....GGGGG....',
+        '...GGGGGGG...',
+        '..GGGGGGGGG..',
+        '.GGGGGGGGGGG.',
+        'GGGGGGGGGGGGG',
+        'GGGGGGGGGGGGG',
+        'GGGGGGGGGGGGG',
+        '.GGGGGGGGGGG.',
+        '..HHHHHHHHH..',
+        '...FFFFF.....',
+        '.....BBB.....'
+      ], map: { G: [C.envelope, 'envelope'], H: [C.heat, 'mouth ring'], F: [C.flame, 'flame'], B: [C.basket, 'basket'] },
+        legend: [[C.envelope, 'envelope'], [C.heat, 'mouth ring'], [C.flame, 'burner flame'], [C.basket, 'basket']],
+        cap: 'Your first balloon, straight out of the studio.' },
+      links: [['Generate your first balloon', 'index.html#YjM']] }
+  ]
+},
+{
+  id: 'assembly', icon: '&#9881;', title: 'Assembly', tag: 'contraption &rarr; vehicle',
+  blurb: 'The physics assembler: what makes a glued-together build a real flying machine.',
+  steps: [
+    { t: 'Contraption &rarr; vehicle',
+      n: '<p>Use the <code>simulated:physics_assembler</code>. Place it against your build, give it redstone, and the structure becomes a <b>physics contraption</b>.</p><p>From that moment blocks have <b>mass</b>, forces apply <b>at their position</b>, and the whole thing can fall, float and crash. This is why balance matters: a thruster mounted off-center twists your craft.</p>',
+      parts: ['simulated:physics_assembler', 'minecraft:redstone'],
+      d: { rows: [
+        '....GGGGGGG....',
+        '....GGGGGGG....',
+        '....GGGGGGG....',
+        '....GGGGGGG....',
+        '.....AAAARR....'
+      ], map: { G: [C.envelope, 'your build'], A: [C.assembler, 'physics assembler'], R: [C.redstone, 'redstone'] },
+        legend: [[C.envelope, 'your build'], [C.assembler, 'physics assembler'], [C.redstone, 'redstone']],
+        cap: 'Assembler against the build, redstone in &mdash; it becomes a physics object.' },
+      links: [] },
+    { t: 'Mass is real',
+      n: '<p>Once assembled, every block counts. Sable assigns real masses per block &mdash; casings and boilers are heavy, wool is light. The studio&rsquo;s Balloon and Crystal tabs model this with an average-block-mass slider: weigh one known craft, set the slider, and the net-lift math is accurate forever.</p>',
+      parts: ['create:andesite_casing', 'create:brass_casing', 'aeronautics:*_envelope'],
+      d: { rows: [
+        'GGGGGGG......',
+        'GGGGGGG..CC..',
+        'GGGGGGG..CC..',
+        '......BBB....',
+        '......BBB....'
+      ], map: { G: [C.envelope, 'envelope'], C: [C.hull, 'casing (heavy)'], B: [C.boiler, 'boiler (heavy)'] },
+        legend: [[C.envelope, 'light blocks'], [C.hull, 'heavy blocks']],
+        cap: 'Heavy blocks pull the center of mass &mdash; keep them low and centered.' },
+      links: [] },
+    { t: 'Force at the point',
+      n: '<p>Thrusters and propellers push <i>from where they are mounted</i>. Lift thrusters must be symmetric around your center of mass or the craft rolls; push thrusters belong on the centerline.</p><div class="note warn"><b>Watch for torque.</b> Off-center thrust = spin. This is the single most common cause of &ldquo;my ship just rolls over&rdquo;.</div>',
+      parts: ['createpropulsionsimulated:thruster', 'aeronautics:propeller_bearing'],
+      d: { rows: [
+        '..H.....H..',
+        'HHHHHHHHHHH',
+        '..T.....T..',
+        '..T.....T..',
+        '.....TT....'
+      ], map: { H: [C.hull, 'hull'], T: [C.thruster, 'thruster'] },
+        legend: [[C.hull, 'hull'], [C.thruster, 'thruster']],
+        cap: 'Lift thrusters mirrored, push thrusters on the centerline.' },
+      links: [] },
+    { t: 'Assemble a real envelope',
+      n: '<p>Do it for real: generate a studio envelope, export the <code>.litematic</code> and paste it with Litematica &mdash; or the <code>.nbt</code> for Create&rsquo;s Schematicannon &mdash; then bolt a physics assembler onto the basket. One click and it&rsquo;s a vehicle.</p>',
+      parts: ['simulated:physics_assembler', 'index.html'],
+      d: { rows: [
+        '....GGGGGGGGGGGG....',
+        '...GGGGGGGGGGGGGG...',
+        '..GGGGGGGGGGGGGGGG..',
+        '.GGGGGGGGGGGGGGGGGG.',
+        '.GGGGGGGGGGGGGGGGGG.',
+        '..GGGGGGGGGGGGGGGG..',
+        '...GGGGGGGGGGGGGG...',
+        '......HHHHHHHH......',
+        '.....BBBBBBBBBB.....',
+        '.......AARR.........'
+      ], map: { G: [C.envelope, 'envelope'], H: [C.heat, 'heat'], B: [C.basket, 'gondola'], A: [C.assembler, 'assembler'], R: [C.redstone, 'redstone'] },
+        legend: [[C.envelope, 'envelope'], [C.heat, 'heat'], [C.basket, 'gondola'], [C.assembler, 'assembler'], [C.redstone, 'redstone']],
+        cap: 'Balloon + basket + assembler = your first ship.' },
+      links: [['Studio: hot-air 1000 (2 burners)', 'index.html#YjMuMTUuMTUuMjAuLi4uLi4uLi44Mw']] }
+  ]
+},
+{
+  id: 'lift', icon: '&#128293;', title: 'Lift', tag: 'hot air &middot; steam &middot; levitite',
+  blurb: 'Envelopes, burners, steam vents and levitite &mdash; and the exact numbers behind each.',
+  steps: [
+    { t: 'Envelopes seal the cavity',
+      n: '<p><b>Envelope blocks</b> (<code>aeronautics:*_envelope</code>, 16 colors) form the sealed cavity of a balloon. The cavity is what lifts: no sealed cavity, no buoyancy.</p><p>The studio generates true balloonshaper profiles &mdash; narrow throat, full-width flare, pointed crown &mdash; and tells you the cavity volume live.</p>',
+      parts: ['aeronautics:*_envelope'],
+      d: { rows: [
+        '....GGGGG....',
+        '...GAAAAAG...',
+        '..GAAAAAAAG..',
+        '.GAAAAAAAAAG.',
+        'GGAAAAAAAAAGG',
+        'GGAAAAAAAAAGG',
+        '.GAAAAAAAAAG.',
+        '..HHHHHHHHH..',
+        '...FFFFF.....'
+      ], map: { G: [C.envelope, 'envelope'], A: [C.air, 'sealed cavity'], H: [C.heat, 'mouth ring'], F: [C.flame, 'flame'] },
+        legend: [[C.envelope, 'envelope'], [C.air, 'sealed cavity (your lift)'], [C.heat, 'mouth ring'], [C.flame, 'flame']],
+        cap: 'The envelope is just the skin &mdash; the sealed air inside does the lifting.' },
+      links: [] },
+    { t: 'Burners heat 500 blocks each',
+      n: '<p><b>Adjustable burners</b> (<code>aeronautics:adjustable_burner</code>) heat the air inside. Each burner heats up to <b>500 blocks</b> of cavity &mdash; that&rsquo;s <code>hotAirBurnerMaxHotAir</code>, straight from the mod&rsquo;s own config.</p><div class="formula">burners = ceil(interior_volume / 500)</div><p>A 1000-block cavity needs 2 burners. A 6000-block flagship needs 12. The studio computes this for every balloon and crystal shard automatically.</p>',
+      parts: ['aeronautics:adjustable_burner'],
+      d: { rows: [
+        '..GGGGGGGGG..',
+        '..HHHHHHHHH..',
+        '....FFFFF....',
+        '...BBBBBBB...',
+        '..BBBBBBBBB..'
+      ], map: { G: [C.envelope, 'envelope'], H: [C.heat, 'mouth'], F: [C.flame, 'flame'], B: [C.burner, 'burner'] },
+        legend: [[C.envelope, 'envelope'], [C.heat, 'mouth'], [C.flame, 'flame'], [C.burner, 'adjustable burner']],
+        cap: 'One burner per 500 blocks of cavity.' },
+      links: [] },
+    { t: 'Heated air lifts 1.5 per block',
+      n: '<p>Heated air lifts <b>1.5 mass units per block</b> (<code>hotAirStrength</code>). A 6000-block balloon lifts 9000 mass units &mdash; minus the weight of the balloon itself.</p><div class="formula">lift = heated_volume &times; 1.5 &nbsp;&middot;&nbsp; net = lift &minus; mass</div><p>The studio ranks its balloon presets by vol/wool efficiency: volume grows with size&sup3;, the envelope only with size&sup2;, so bigger balloons carry more per wool block.</p>',
+      parts: ['aeronautics:*_envelope', 'aeronautics:adjustable_burner'],
+      d: { rows: [
+        '..GGGGGGGGGGGGGG..',
+        '.GGGGGGGGGGGGGGGG.',
+        'GGGGGGGGGGGGGGGGGG',
+        'GGGGGGGGGGGGGGGGGG',
+        '.GGGGGGGGGGGGGGGG.',
+        '..GGGGGGGGGGGGGG..',
+        '...HHHHHHHHHHHH...',
+        '....FFFFFFFFFF....'
+      ], map: { G: [C.envelope, 'envelope'], H: [C.heat, 'heat'], F: [C.flame, 'flame'] },
+        legend: [[C.envelope, 'envelope'], [C.heat, 'heat'], [C.flame, 'flame']],
+        cap: '6000 blocks heated &times; 1.5 = 9000 lift.' },
+      links: [] },
+    { t: 'Steam and levitite',
+      n: '<p><b>Steam vents</b> (<code>aeronautics:steam_vent</code>) pipe steam in from a Create boiler: <b>5000 blocks per vent</b>, same 1.5 strength per block. Boiler-fed lift scales far beyond burners.</p><p><b>Levitite</b> (<code>aeronautics:levitite</code>, <code>pearlescent_levitite</code>) is the magic floating rock &mdash; permanent lift, no burners, no fuel. Pricier, and it doesn&rsquo;t let you descend on demand the way cooling air does.</p>',
+      parts: ['aeronautics:steam_vent', 'create:steam_engine', 'aeronautics:levitite', 'aeronautics:pearlescent_levitite'],
+      d: { rows: [
+        '..SSSS........',
+        '.SSSSSS..LL...',
+        '..SSSS..LLL...',
+        '....BBBBLL....',
+        '....BBBBBB....'
+      ], map: { S: [C.steam, 'steam'], B: [C.boiler, 'boiler'], L: [C.levitite, 'levitite'] },
+        legend: [[C.steam, 'steam vent'], [C.boiler, 'boiler'], [C.levitite, 'levitite']],
+        cap: 'Steam vents scale lift; levitite floats for free.' },
+      links: [] },
+    { t: 'Lift something',
+      n: '<p>Open the balloon tab and drag the size sliders &mdash; the requirements bar shows burners, lift, estimated mass and the flies/too-heavy verdict live. The crystal tab does the same math for shard cavities: it sizes the burners, you fit the interior.</p>',
+      parts: ['index.html'],
+      d: { rows: [
+        '....GGGGG....',
+        '...GGGGGGG...',
+        '..GGGGGGGGG..',
+        '.GGGGGGGGGGG.',
+        'GGGGGGGGGGGGG',
+        '.GGGGGGGGGGG.',
+        '..HHHHHHHHH..',
+        '...FFFFF.....',
+        '.....BBB.....'
+      ], map: { G: [C.envelope, 'envelope'], H: [C.heat, 'heat'], F: [C.flame, 'flame'], B: [C.basket, 'basket'] },
+        legend: [[C.envelope, 'envelope'], [C.heat, 'heat'], [C.flame, 'flame'], [C.basket, 'basket']],
+        cap: 'The math lives in the tab &mdash; watch it while you drag.' },
+      links: [['Studio: hot-air 1000 (2 burners)', 'index.html#YjMuMTUuMTUuMjAuLi4uLi4uLi44Mw'], ['Studio: balloon 18000 (36 burners, exact)', 'index.html#YjM']] }
+  ]
+},
+{
+  id: 'thrust', icon: '&#9889;', title: 'Thrust', tag: 'propellers &middot; thrusters',
+  blurb: 'Propellers on rotating shafts, fuel and ion thrusters &mdash; and where to mount them.',
+  steps: [
+    { t: 'Aeronautics propellers',
+      n: '<table><tr><th>Part</th><th>Thrust</th><th>Airflow</th><th>Notes</th></tr><tr><td><code>wooden_propeller</code></td><td>1.0</td><td>0.1</td><td>cheap, on rotating shafts</td></tr><tr><td><code>andesite_propeller</code></td><td>1.0</td><td>0.1</td><td>same force, tougher</td></tr><tr><td><code>smart_propeller</code></td><td>1.0</td><td>0.1</td><td>auto-adjusts pitch</td></tr><tr><td><code>propeller_bearing</code></td><td>0.2</td><td>0.05</td><td>multiplies with speed</td></tr><tr><td><code>gyroscopic_propeller_bearing</code></td><td>0.2</td><td>0.05</td><td>gyro-stabilized</td></tr></table><p>Values are the defaults in Aeronautics&rsquo; physics config (<code>AeroPhysics</code>), confirmed against the jars in this pack.</p>',
+      parts: ['aeronautics:wooden_propeller', 'aeronautics:propeller_bearing', 'aeronautics:gyroscopic_propeller_bearing'],
+      d: { rows: [
+        '.......W.......',
+        '.....WWWWW.....',
+        '....WWWWWWW....',
+        'WWWWWWWOWWWWWWW',
+        '....WWWWWWW....',
+        '.....WWWWW.....',
+        '.......W.......'
+      ], map: { W: [C.wool, 'blade'], O: [C.hub, 'bearing hub'] },
+        legend: [[C.wool, 'blade'], [C.hub, 'bearing hub']],
+        cap: 'A 4-blade propeller &mdash; one hub block, blades out from it.' },
+      links: [] },
+    { t: 'The one-block center',
+      n: '<p>Propellers mount on a <b>bearing</b> at the exact middle of the disc, and the studio&rsquo;s Propeller tab always generates <b>exactly one hub block</b> there &mdash; tick <b>Force one-block center</b> and it is guaranteed whatever the blade parameters. Blades still fill their whole root row &mdash; nothing gets cleared around the hub.</p>',
+      parts: ['aeronautics:propeller_bearing', 'index.html'],
+      d: { rows: [
+        '.....WWWWW.....',
+        '....WWWWWWW....',
+        'WWWWWWWOWWWWWWW',
+        '....WWWWWWW....',
+        '.....WWWWW.....'
+      ], map: { W: [C.wool, 'blade row'], O: [C.hub, 'one hub block'] },
+        legend: [[C.wool, 'blade row'], [C.hub, 'one hub block']],
+        cap: 'One hub, and the root row keeps every one of its blocks.' },
+      links: [['Studio: basic propeller', 'index.html#cDM']] },
+    { t: 'Thrusters: fuel and ions',
+      n: '<table><tr><th>Part</th><th>Thrust</th><th>Notes</th></tr><tr><td><code>createpropulsionsimulated:thruster</code></td><td>600 pN</td><td>turpentine fuel, internal 250 mB tank, pipe more in</td></tr><tr><td><code>createpropulsionsimulated:ion_thruster</code></td><td>1000 pN</td><td>80 FE/t at full throttle</td></tr><tr><td><code>createpropulsionsimulated:creative_thruster</code></td><td>10 000 pN</td><td>testing/creative builds</td></tr></table><p>Fuel thrusters need turpentine; ion thrusters need FE. Check the 10-block obstruction scan behind the nozzle before you fly.</p>',
+      parts: ['createpropulsionsimulated:thruster', 'createpropulsionsimulated:ion_thruster', 'createpropulsionsimulated:creative_thruster'],
+      d: { rows: [
+        '..H.....H..',
+        'HHHHHHHHHHH',
+        '..T.....T..',
+        '..T.....T..',
+        '.....TT....'
+      ], map: { H: [C.hull, 'hull'], T: [C.thruster, 'thruster'] },
+        legend: [[C.hull, 'hull'], [C.thruster, 'thruster']],
+        cap: 'Lift thrusters down and mirrored, push thrusters on the centerline.' },
+      links: [] },
+    { t: 'Mount on the centerline',
+      n: '<p>Force-at-point physics: thrusters and propellers push <i>from their mount point</i>. Lift thrusters must be symmetric around the center of mass or the craft rolls; push thrusters belong on the centerline. The studio&rsquo;s twin-prop option mounts outriggers symmetrically for exactly this reason.</p><div class="note good"><b>Rule:</b> if it pushes, mirror it. If it rolls, you didn&rsquo;t.</div>',
+      parts: ['createpropulsionsimulated:thruster', 'aeronautics:propeller_bearing'],
+      d: { rows: [
+        '..T.....T..',
+        '..T..H..T..',
+        'HHHHHHHHHHH',
+        '..T..H..T..',
+        '..T.....T..'
+      ], map: { T: [C.thruster, 'thruster'], H: [C.hull, 'hull'] },
+        legend: [[C.thruster, 'thruster'], [C.hull, 'hull']],
+        cap: 'Mirrored mounts cancel torque; asymmetric mounts create it.' },
+      links: [['Studio: basic propeller', 'index.html#cDM'], ['Studio: Giant propeller', 'index.html#cDMuNDAuNi4yLjMwLjEuYy53']] }
+  ]
+},
+{
+  id: 'steering', icon: '&#127918;', title: 'Steering &amp; Controls', tag: 'aim &middot; land &middot; tether',
+  blurb: 'Steering wheels, throttles, sensors, ropes, docking &mdash; and the submarine corner.',
+  steps: [
+    { t: 'Hands on the wheel',
+      n: '<p><code>simulated:steering_wheel</code> &mdash; yaw/pitch/roll input for your ship. <code>simulated:throttle_lever</code> &mdash; analog power to engines (Lever drugster makes Create&rsquo;s stepped levers behave like throttle levers too). <code>simulated:directional_gearshift</code> &mdash; forward/neutral/reverse for shaft-driven props.</p>',
+      parts: ['simulated:steering_wheel', 'simulated:throttle_lever', 'simulated:directional_gearshift'],
+      d: { rows: [
+        '....WWWW....',
+        '..WWWWWWWW..',
+        '...WWWWWW...',
+        '....WWWW....',
+        '............',
+        '....LLLL....',
+        '....LLLL....',
+        '....LLLL....',
+        '....LLLL....'
+      ], map: { W: [C.control, 'steering wheel'], L: [C.control, 'throttle lever'] },
+        legend: [[C.control, 'wheel &amp; lever']],
+        cap: 'Wheel for attitude, lever for power.' },
+      links: [] },
+    { t: 'Sensors',
+      n: '<p>Wire sensors to logic for auto-hover, autopilot and docking routines:</p><ul><li><code>altitude_sensor</code>, <code>velocity_sensor</code>, <code>gimbal_sensor</code></li><li><code>optical_sensor</code>, <code>laser_sensor</code> + <code>laser_pointer</code></li><li><code>redstone_accumulator</code> / <code>redstone_inductor</code> &mdash; redstone storage and transmission across contraptions</li></ul>',
+      parts: ['simulated:altitude_sensor', 'simulated:velocity_sensor', 'simulated:gimbal_sensor', 'simulated:laser_sensor'],
+      d: { rows: [
+        '..S....S....',
+        '..S..S..S...',
+        '.....S......',
+        '..S..S..S...',
+        '..S....S....'
+      ], map: { S: [C.sensor, 'sensor'] },
+        legend: [[C.sensor, 'sensor']],
+        cap: 'Sensors turn manual flight into automatic flight.' },
+      links: [] },
+    { t: 'Ropes and docking',
+      n: '<p><code>simulated:rope_connector</code> + <code>rope_winch</code> &mdash; real physical ropes to tether and lower things from your ship. With <b>Climbable Ropes for Create Aeronautics</b> you can grab a rope with empty hands and climb it (W/S up/down, Space to jump off, Sneak to let go).</p><p><code>simulated:docking_connector</code> / <code>paired_docking_connector</code> lock your ship to a station or another ship. <code>vsfluidlink:hose_connector</code> (+ magnet, chain, wire variants) connects fluids, items and redstone between ship and world.</p>',
+      parts: ['simulated:rope_connector', 'simulated:rope_winch', 'simulated:docking_connector', 'vsfluidlink:hose_connector'],
+      d: { rows: [
+        '...SS.........',
+        '...SS.........',
+        '...SS..DD.....',
+        '..DDDDDD......',
+        '.DDDDDDDD.....',
+        'DDDDDDDDDD....'
+      ], map: { S: [C.rope, 'rope'], D: [C.hull, 'dock'] },
+        legend: [[C.rope, 'rope'], [C.hull, 'dock']],
+        cap: 'Winch down, dock up, tether tight.' },
+      links: [] },
+    { t: 'Deep Seas: submarines',
+      n: '<p>Going under? <code>create_submarine:ballast_tank</code> + <code>ballast_vent</code> fill with water to dive and vent to surface. <code>copper_pressurizer</code> / <code>iron_pressurizer</code> keep the cabin sealed against depth pressure; <code>electrolyzer</code> + <code>oxygene_diffuser</code> produce and spread breathable air; <code>submarine_propeller</code> / <code>water_thruster</code> push you; <code>decompression_chamber</code> makes diving transitions safe.</p><div class="note warn"><b>Alpha warning</b> &mdash; Deep Seas is early access; mechanics may change.</div>',
+      parts: ['create_submarine:ballast_tank', 'create_submarine:iron_pressurizer', 'create_submarine:electrolyzer'],
+      d: { rows: [
+        '.......BBB.......',
+        '......BBBBB......',
+        '..W..BBBBBBB..W..',
+        '..W..BBBBBBB..W..',
+        '..W..BBBBBBB..W..',
+        '......BBBBB......',
+        '.......BBB.......'
+      ], map: { B: [C.hull, 'pressure hull'], W: [C.water, 'water'] },
+        legend: [[C.hull, 'pressure hull'], [C.water, 'water']],
+        cap: 'Sealed hull, ballast tanks, and air to breathe.' },
+      links: [] },
+    { t: 'If it renders wrong',
+      n: '<p>Aeronautics 1.3.0 lists <b>known visual issues with Iris shaders</b> &mdash; if something renders wrong, disable Iris first and re-test before you blame your build.</p>',
+      parts: ['iris shaders'],
+      d: { rows: [
+        '...!...',
+        '..!!!..',
+        '.!GGG!.',
+        '..!!!..',
+        '...!...'
+      ], map: { G: [C.envelope, 'craft'], '!': [C.redstone, 'glitch'] },
+        legend: [[C.envelope, 'craft'], [C.redstone, 'rendering glitch']],
+        cap: 'Flickering blocks? Try disabling Iris first.' },
+      links: [] }
+  ]
+},
+{
+  id: 'anatomy', icon: '&#9971;', title: 'Airship Anatomy', tag: 'five systems',
+  blurb: 'Every airship is the same five systems. Size each one, in order, with the in-tab math.',
+  steps: [
+    { t: 'The five systems',
+      n: '<p>Every airship is the same five systems: <b>envelope, heat, gondola, propulsion, control</b>. Size each one with the studio&rsquo;s in-tab math, generate the shapes, and assemble them with the physics assembler.</p>',
+      parts: ['simulated:physics_assembler'],
+      d: { rows: [
+        '....GGGGGGGGGGGG....',
+        '....GGGGGGGGGGGG....',
+        '....GGGGGGGGGGGG....',
+        '....GGGGGGGGGGGG....',
+        '......HHHHHHHH......',
+        '.....BBBBBBBBBB.....',
+        '.....BBBBBBBBBB.....',
+        '..WW.........WW.....'
+      ], map: { G: [C.envelope, 'envelope'], H: [C.heat, 'heat'], B: [C.basket, 'gondola'], W: [C.wool, 'propulsion'] },
+        legend: [[C.envelope, 'envelope'], [C.heat, 'heat'], [C.basket, 'gondola'], [C.wool, 'propulsion']],
+        cap: 'All five systems, one ship.' },
+      links: [] },
+    { t: 'Envelope &mdash; your lift',
+      n: '<p><code>aeronautics:*_envelope</code> &mdash; or a hollow crystal shard shell (glass, amethyst, levitite&hellip;). It is the sealed air cavity, nothing more and nothing less. No cavity, no lift.</p>',
+      parts: ['aeronautics:*_envelope'],
+      d: { rows: [
+        '....GGGGG....',
+        '...GGGGGGG...',
+        '..GGGGGGGGG..',
+        '.GGGGGGGGGGG.',
+        'GGGGGGGGGGGGG',
+        '.GGGGGGGGGGG.',
+        '..GGGGGGGGG..',
+        '...GGGGGGG...',
+        '....GGGGG....'
+      ], map: { G: [C.envelope, 'envelope'] },
+        legend: [[C.envelope, 'envelope']],
+        cap: 'The envelope is the cavity&rsquo;s skin.' },
+      links: [['Studio: hot-air 1000 (2 burners)', 'index.html#YjMuMTUuMTUuMjAuLi4uLi4uLi44Mw']] },
+    { t: 'Heat &mdash; make the air lift',
+      n: '<p><code>aeronautics:adjustable_burner</code>, one per 500 blocks of cavity &mdash; or a steam boiler feeding <code>steam_vent</code>s, one per 5000 blocks. This is the only system that can fail mid-flight: count your burners twice.</p>',
+      parts: ['aeronautics:adjustable_burner', 'aeronautics:steam_vent'],
+      d: { rows: [
+        '..GGGGGGGGG..',
+        '..HHHHHHHHH..',
+        '....FFFFF....',
+        '...BBBBBBB...',
+        '..BBBBBBBBB..'
+      ], map: { G: [C.envelope, 'envelope'], H: [C.heat, 'mouth'], F: [C.flame, 'flame'], B: [C.burner, 'burner'] },
+        legend: [[C.envelope, 'envelope'], [C.heat, 'mouth'], [C.flame, 'flame'], [C.burner, 'burner']],
+        cap: 'Heat the cavity, get 1.5 lift per block.' },
+      links: [] },
+    { t: 'Gondola &mdash; everything heavy',
+      n: '<p>Your build: decks, casings, Deco hulls, seats, windows, and the interiors you fit into hollow crystal shards. Everything heavy hangs below or clings to the envelope &mdash; and its weight is exactly what your net lift must beat.</p>',
+      parts: ['createdeco:industrial_iron_hull', 'create:*_seat'],
+      d: { rows: [
+        '...GGGGGGG...',
+        '...GGGGGGG...',
+        '......HH.....',
+        '....BBBBBB...',
+        '....B..B.B...',
+        '....B..B.B...',
+        '....BBBBBB...'
+      ], map: { G: [C.envelope, 'envelope'], H: [C.rope, 'ropes'], B: [C.basket, 'gondola'] },
+        legend: [[C.envelope, 'envelope'], [C.rope, 'ropes'], [C.basket, 'gondola']],
+        cap: 'Heavy things below the envelope, on the centerline.' },
+      links: [] },
+    { t: 'Propulsion &mdash; forward motion',
+      n: '<p>A Create shaft network into a <code>propeller_bearing</code> and a propeller &mdash; or CPS thrusters. Bearings multiply with shaft speed; fuel thrusters sip turpentine; ion thrusters want FE. Whatever you pick, mirror it.</p>',
+      parts: ['create:shaft', 'aeronautics:propeller_bearing', 'createpropulsionsimulated:thruster'],
+      d: { rows: [
+        '.......W.......',
+        '.....WWWWW.....',
+        'WWWWWWWOWWWWWWW',
+        '.....WWWWW.....',
+        '.......W.......',
+        '.....SSSS......',
+        '.....SSSS......'
+      ], map: { W: [C.wool, 'propeller'], O: [C.hub, 'bearing'], S: [C.shaft, 'shaft'] },
+        legend: [[C.wool, 'propeller'], [C.hub, 'bearing'], [C.shaft, 'shaft network']],
+        cap: 'Bearing on a shaft, blades on the bearing.' },
+      links: [['Studio: basic propeller', 'index.html#cDM']] },
+    { t: 'Control &mdash; aim, land, tether',
+      n: '<p><code>steering_wheel</code>, <code>throttle_lever</code>, ropes, docking. Sable physics punishes asymmetry with constant roll, so keep heavy things (boilers, tanks, cargo) directly under the envelope&rsquo;s center and propellers on the centerline.</p><div class="note good"><b>Balance rule of thumb:</b> heavy blocks low and centered, thrust mirrored &mdash; then it flies straight.</div>',
+      parts: ['simulated:steering_wheel', 'simulated:throttle_lever', 'simulated:rope_connector'],
+      d: { rows: [
+        '....WWWW....',
+        '..WWWWWWWW..',
+        '...WWWWWW...',
+        '....WWWW....',
+        '............',
+        '....LLLL....',
+        '....LLLL....'
+      ], map: { W: [C.control, 'wheel'], L: [C.control, 'lever'] },
+        legend: [[C.control, 'wheel &amp; lever']],
+        cap: 'Control is the difference between flying and floating away.' },
+      links: [] }
+  ]
+},
+{
+  id: 'builds', icon: '&#127959;', title: 'Example Builds', tag: 'seven ships',
+  blurb: 'Seven complete craft &mdash; each step is a build plan with the exact blocks and a studio link for the schematic.',
+  steps: [
+    { t: 'Starter hot-air balloon',
+      n: '<p>Your first ship: one envelope, two burners, one basket. Lift &asymp; 1500, balloon weight &asymp; 500 &mdash; carries a cozy basket and a chest.</p><ul><li>Envelope from the studio: 15&times;15&times;20 hot-air, 1000-block cavity, 2 burners.</li><li>2&times; <code>aeronautics:adjustable_burner</code> under the envelope&rsquo;s mouth.</li><li>Basket: oak planks floor + fence walls, hanging by 4&times; <code>simulated:rope_connector</code>.</li><li>1&times; <code>simulated:physics_assembler</code> touching the basket to make it fly.</li></ul>',
+      parts: ['aeronautics:adjustable_burner', 'simulated:rope_connector', 'simulated:physics_assembler'],
+      d: { rows: [
+        '....GGGGG....',
+        '...GGGGGGG...',
+        '..GGGGGGGGG..',
+        '.GGGGGGGGGGG.',
+        'GGGGGGGGGGGGG',
+        '.GGGGGGGGGGG.',
+        '..HHHHHHHHH..',
+        '...FFFFF.....',
+        '.....BBB.....'
+      ], map: { G: [C.envelope, 'envelope'], H: [C.heat, 'mouth'], F: [C.flame, 'flame'], B: [C.basket, 'basket'] },
+        legend: [[C.envelope, 'envelope'], [C.heat, 'mouth'], [C.flame, 'flame'], [C.basket, 'basket']],
+        cap: '15&times;15&times;20, 1000 blocks of cavity, two burners.' },
+      links: [['Studio: hot-air 1000 (2 burners)', 'index.html#YjMuMTUuMTUuMjAuLi4uLi4uLi44Mw']] },
+    { t: 'Crystal shard',
+      n: '<p>The studio&rsquo;s signature build: a rhombus crystal shard in the Blade &amp; Sorcery style &mdash; pointed at <b>both</b> ends (the <code>/\</code> over <code>\/</code> diamond). Shards <b>lie horizontal</b> by default: the long axis runs along X, nose forward, like a bullet in flight (one click flips it upright).</p><p>It is a pure shard: no deck, no drive &mdash; you fit the interior. The studio reports the cavity volume, the burners it needs (1 per 500 blocks) and the lift (&times;1.5) live, so you know exactly what your interior can weigh. The default shard (44 long, 16&times;10 widest) heats 770 blocks of cavity &mdash; 2 burners, net lift &asymp; +500.</p><ul><li><b>Center</b>: odd = a single block at the cross-section middle; even = a 2&times;2 junction.</li><li><b>Imperfections</b>: vertex jitter, asymmetric taper, truncated tips, seeded cracks and glowing inclusions (sized as a <b>% of the hull</b>) &mdash; the seed reproduces the exact shard on any machine.</li><li><b>Materials</b>: every glass &mdash; clear, tinted, and all 16 stained glass colors &mdash; or amethyst / levitite / pearlescent levitite; inclusions glow in sea lantern, amethyst, glowstone, shroomlight or any froglight.</li><li><b>Balance check</b>: drop your ship schematic into the Crystal tab &mdash; it renders inside the shard and grades all six axes (back/forth, left/right, up/down, tilt, pan, yaw) with a PERFECTLY STRAIGHT / WONKY / UNEVEN verdict, per-axis fixes, ship-position sliders and a one-click auto-trim.</li></ul>',
+      parts: ['minecraft:glass', 'aeronautics:levitite', 'index.html'],
+      d: { rows: [
+        '...........C...........',
+        '........CCCCCCC........',
+        '.....CCCCCCCCCCCCC.....',
+        '..CCCCCCCCCCCCCCCCCCC..',
+        'CCCCCCCCCCCCCCCCCCCCCCC',
+        '.CCCCCCCCCCCCCCCCCCCCC.',
+        '..CCCCCCCCCCCCCCCCCCC..',
+        '.....CCCCCCCCCCCCC.....',
+        '........CCCCCCC........',
+        '...........C...........'
+      ], map: { C: [C.amethyst, 'shard hull'] },
+        legend: [[C.amethyst, 'shard hull (glass, amethyst, levitite&hellip;)']],
+        cap: 'Double-terminated, lying horizontal, nose forward.' },
+      links: [['Horizontal Shard (default &mdash; flies)', 'index.html#YzU'], ['Bullet (tinted, 2.5-block nose dip)', 'index.html#YzUuNTYuMTQuMTQuNi4xNjAwLjM1LjUuLi4yNTAuLi41Li4uNy4uLi4udA'], ['Twin-Spike (pure diamond, levitite)', 'index.html#YzUuNDguMTIuMTIuLjcwMC4uMC4uNjAwMC4uMjAwLi4uLi4yMS4uLi4ubA'], ['Amethyst Giant', 'index.html#YzUuNjAuMjIuMjIuNi45MDAuLjIwLi4zMDAwLi4uLjEyLi4uMy4uLi4uYQ'], ['Shattered Hex (truncated, 8 cracks)', 'index.html#YzUuNDAuMjQuMTYuNi4uLjEwLjI1Li4yMDAuLjE1Li44LjUuNzc'], ['Upright Shard (even center)', 'index.html#YzUuLjE0Li4uLi4uLi4wLi4uLi4uMTEuLi4uLi4udi5l']] },
+    { t: 'Flagship airship',
+      n: '<p>The classic dirigible, modernized: the studio&rsquo;s flagship balloon, two propellers on outriggers, and a crystal-tipped bow if you&rsquo;re feeling fancy.</p><ul><li>Envelope: 33&times;33&times;38 hot-air (18000 cavity, 36 burners) &mdash; the studio&rsquo;s default balloon.</li><li>Power: a Create shaft network to each side, or a steam boiler feeding the line.</li><li>2&times; <code>aeronautics:propeller_bearing</code> + 2&times; <code>aeronautics:wooden_propeller</code> on wing outriggers, left and right, at envelope center height.</li><li>Gondola below: Deco <code>createdeco:industrial_iron_hull</code> + sheet metal, a <code>steering_wheel</code> and two <code>throttle_lever</code>s.</li></ul>',
+      parts: ['aeronautics:propeller_bearing', 'aeronautics:wooden_propeller', 'createdeco:industrial_iron_hull'],
+      d: { rows: [
+        '....GGGGGGGGGGGG....',
+        '...GGGGGGGGGGGGGG...',
+        '..GGGGGGGGGGGGGGGG..',
+        '.GGGGGGGGGGGGGGGGGG.',
+        'GGGGGGGGGGGGGGGGGGGG',
+        '.GGGGGGGGGGGGGGGGGG.',
+        '..WW....GGGG....WW..',
+        '..WW....GGGG....WW..',
+        '......HHHHHHHH......',
+        '.....BBBBBBBBBB.....'
+      ], map: { G: [C.envelope, 'envelope'], W: [C.wool, 'propeller'], H: [C.heat, 'heat'], B: [C.hull, 'gondola'] },
+        legend: [[C.envelope, 'envelope'], [C.wool, 'propeller'], [C.heat, 'heat'], [C.hull, 'gondola']],
+        cap: '33&times;33&times;38, twin outrigger props, Deco gondola.' },
+      links: [['Studio: balloon 18000 (36 burners, exact)', 'index.html#YjM']] },
+    { t: 'Hovercraft',
+      n: '<p>No envelope &mdash; pure thrust on a flat hull. Lift thrusters underneath (facing down), push thrusters at the rear (facing away from the bow). Symmetry is everything.</p><ul><li>Hull: <code>createdeco:industrial_iron_hull</code> deck, 12&times;8, with a rounded nose.</li><li>4&times; <code>createpropulsionsimulated:thruster</code> facing <b>down</b>, symmetric (4 corners).</li><li>2&times; <code>createpropulsionsimulated:thruster</code> at the rear facing <b>back</b>.</li><li>Fuel: turpentine piped from tanks to each thruster (each holds 250 mB internally).</li><li>Controls: <code>steering_wheel</code> + <code>throttle_lever</code>, ion upgrade when you have FE.</li></ul><div class="formula">hover requires: lift_thrusters &times; 600 pN &ge; craft_mass &times; gravity</div>',
+      parts: ['createpropulsionsimulated:thruster', 'simulated:steering_wheel'],
+      d: { rows: [
+        '..H.....H..',
+        'HHHHHHHHHHH',
+        '..T.....T..',
+        '..T.....T..',
+        '.....TT....'
+      ], map: { H: [C.hull, 'hull'], T: [C.thruster, 'thruster'] },
+        legend: [[C.hull, 'hull'], [C.thruster, 'thruster']],
+        cap: 'Four lift thrusters down, two push thrusters back.' },
+      links: [] },
+    { t: 'Prop plane',
+      n: '<ul><li>Wings from the studio (glider or fighter planform, copycat wing blocks).</li><li>1&times; <code>aeronautics:propeller_bearing</code> + <code>andesite_propeller</code> in the nose.</li><li>Tail: small stabilizer wings + rudder from <code>create:*_sail</code> blocks.</li><li><code>simulated:steering_wheel</code> for the elevators, <code>throttle_lever</code> for power.</li></ul>',
+      parts: ['createpropulsionsimulated:copycat_wing', 'aeronautics:andesite_propeller'],
+      d: { rows: [
+        '........W...........',
+        '.WWWWWWWWWWWWWWWW...',
+        'WWWWWWWWWWWWWWWWWW..',
+        '.WWWWWWWWWWWWWWWW...',
+        '........W...........',
+        '..O....H............',
+        '..O...HHHHHHHHH.....',
+        '..O....H............',
+        '.......H............'
+      ], map: { W: [C.wool, 'wing'], H: [C.hull, 'fuselage'], O: [C.hub, 'prop hub'] },
+        legend: [[C.wool, 'wing'], [C.hull, 'fuselage'], [C.hub, 'prop hub']],
+        cap: 'Wings for lift, a nose prop for thrust.' },
+      links: [['Studio: glider wings', 'index.html#dzQuMjAuNS4xLjE'], ['Studio: fighter wings', 'index.html#dzQuLjcuLjY'], ['Studio: delta wings', 'index.html#dzQuMTQuMTIuMS4wLmQ']] },
+    { t: 'Submarine (Deep Seas)',
+      n: '<ul><li>Pressure hull: <code>createdeco:industrial_iron_hull</code> + sheet metal, fully sealed cabin.</li><li>2&times; <code>create_submarine:ballast_tank</code> + 2&times; <code>ballast_vent</code> (fore and aft, symmetric).</li><li>1&times; <code>create_submarine:iron_pressurizer</code>, 1&times; <code>electrolyzer</code>, 1&times; <code>oxygene_diffuser</code>.</li><li>Drive: <code>create_submarine:submarine_propeller</code> on a Create shaft, or <code>water_thruster</code>s.</li><li>Test dives shallow &mdash; pressure increases with depth and the hull is your only protection.</li></ul>',
+      parts: ['create_submarine:ballast_tank', 'create_submarine:iron_pressurizer', 'create_submarine:submarine_propeller'],
+      d: { rows: [
+        '.......BBB.......',
+        '......BBBBB......',
+        '..W..BBBBBBB..W..',
+        '..W..BBBBBBB..W..',
+        '..W..BBBBBBB..W..',
+        '......BBBBB......',
+        '.......BBB.......'
+      ], map: { B: [C.hull, 'pressure hull'], W: [C.water, 'water'] },
+        legend: [[C.hull, 'pressure hull'], [C.water, 'water']],
+        cap: 'Sealed, pressurized, and never deeper than you planned.' },
+      links: [] },
+    { t: 'Showpiece shapes',
+      n: '<p>Sometimes you just need a shape. The Shapes tab does sphere, ellipsoid, cylinder, cone, pyramid, torus and dome &mdash; hollow or solid, any real material. Perfect for stations, observatories and airship terminals.</p>',
+      parts: ['index.html'],
+      d: { rows: [
+        '...OOOOOOO...',
+        '..OOOOOOOOO..',
+        '.OOOOOOOOOOO.',
+        'OOOOOOOOOOOOO',
+        '.OOOOOOOOOOO.',
+        '..OOOOOOOOO..',
+        '...OOOOOOO...'
+      ], map: { O: [C.glass, 'shape block'] },
+        legend: [[C.glass, 'shape block']],
+        cap: 'A hollow sphere, straight from the Shapes tab.' },
+      links: [['Studio: round blimp', 'index.html#YjMuMzYuMTguMTYuLi4uLi4uLjA'], ['Studio: teardrop', 'index.html#YjMuMzAuMTYuMjAuLi44MC4uMTUuLi4w'], ['Studio: hollow sphere', 'index.html#aDU'], ['Studio: dome', 'index.html#aDUuZG8uMjEuMTQuMjE'], ['Studio: torus ring', 'index.html#aDUudG8uMzAuMTAuMzA'], ['Studio: glass sphere', 'index.html#aDUuLjE2LjE2LjE2Li4uLmc']] },
+    { t: 'Now build it',
+      n: '<p>Open a link, export and paste &mdash; <code>.litematic</code> loads straight into Litematica (Forgematica), <code>.nbt</code> feeds Create&rsquo;s Schematicannon &mdash; and build along the studio&rsquo;s Ponder-style guide. Every model ships a build sequence with per-step highlights &mdash; scrub through it while you place blocks.</p><div class="note good"><b>You now know the whole loop:</b> generate &rarr; export &rarr; paste &rarr; assemble &rarr; fly.</div>',
+      parts: ['index.html', 'litematica'],
+      d: { rows: [
+        '....GGGGGGGGGGGG....',
+        '...GGGGGGGGGGGGGG...',
+        '..GGGGGGGGGGGGGGGG..',
+        '.GGGGGGGGGGGGGGGGGG.',
+        'GGGGGGGGGGGGGGGGGGGG',
+        '.GGGGGGGGGGGGGGGGGG.',
+        '..WW....GGGG....WW..',
+        '......HHHHHHHH......',
+        '.....BBBBBBBBBB.....'
+      ], map: { G: [C.envelope, 'envelope'], W: [C.wool, 'propeller'], H: [C.heat, 'heat'], B: [C.basket, 'gondola'] },
+        legend: [[C.envelope, 'envelope'], [C.wool, 'propeller'], [C.heat, 'heat'], [C.basket, 'gondola']],
+        cap: 'Generate, export, paste, assemble &mdash; then fly.' },
+      links: [['Studio: basic propeller', 'index.html#cDM'], ['Studio: balloon 18000', 'index.html#YjM']] }
+  ]
+},
+{
+  id: 'math', icon: '&#128207;', title: 'The Math', tag: 'size your own craft',
+  blurb: 'The formulas, a fully worked 6000-block example, and the propeller numbers.',
+  steps: [
+    { t: 'The lift formula',
+      n: '<div class="formula">lift = interior_volume &times; 1.5 &nbsp;&middot;&nbsp; burners = ceil(interior / 500) &nbsp;&middot;&nbsp; net = lift &minus; mass</div><p>mass = (hull blocks + burners + everything else) &times; average block mass + payload. Sable assigns real masses per block; the average-block-mass slider in the Balloon and Crystal tabs is your tuning knob &mdash; set it by weighing a known craft once, then it&rsquo;s accurate forever.</p><p>The math lives <b>inside</b> each tab: Balloon and Crystal show burners, lift, estimated mass and net lift live for the exact shape on screen; Propeller shows swept-disc geometry and material totals.</p>',
+      parts: ['index.html'],
+      d: { rows: [
+        '..GGGGGGGGGGGGGG..',
+        '.GGGGGGGGGGGGGGGG.',
+        'GGGGGGGGGGGGGGGGGG',
+        'GGGGGGGGGGGGGGGGGG',
+        '.GGGGGGGGGGGGGGGG.',
+        '..GGGGGGGGGGGGGG..',
+        '...HHHHHHHHHHHH...',
+        '....FFFFFFFFFF....'
+      ], map: { G: [C.envelope, 'envelope'], H: [C.heat, 'heat'], F: [C.flame, 'flame'] },
+        legend: [[C.envelope, 'envelope'], [C.heat, 'heat'], [C.flame, 'flame']],
+        cap: 'Volume &times; 1.5, burners per 500, subtract the mass.' },
+      links: [['Studio: balloon 18000', 'index.html#YjM']] },
+    { t: 'Worked example: the 6000 balloon',
+      n: '<table><tr><th>Quantity</th><th>Value</th><th>Where it comes from</th></tr><tr><td>Interior volume</td><td>6000 blocks</td><td>studio (21&times;21&times;26 hot-air, scale 1.175)</td></tr><tr><td>Burners</td><td>12</td><td>6000 / 500</td></tr><tr><td>Lift</td><td>9000 mass units</td><td>6000 &times; 1.5 (hotAirStrength)</td></tr><tr><td>Envelope weight</td><td>&asymp;1438 blocks</td><td>studio (pruned envelope)</td></tr><tr><td>Mass at 1.0/block</td><td>&asymp;1450</td><td>1438 wool + 12 burners</td></tr><tr><td><b>Net lift</b></td><td><b>&asymp;+7550</b></td><td>your budget for gondola, cargo and crew</td></tr></table><p class="dim" style="color:var(--faint); font-size:12.5px">Efficiency scales with size: volume grows with size&sup3;, the envelope only with size&sup2; &mdash; bigger balloons carry more per wool block.</p>',
+      parts: ['aeronautics:adjustable_burner'],
+      d: { rows: [
+        '..GGGGGGGGGGGGGG..',
+        '.GGGGGGGGGGGGGGGG.',
+        'GGGGGGGGGGGGGGGGGG',
+        'GGGGGGGGGGGGGGGGGG',
+        '.GGGGGGGGGGGGGGGG.',
+        '..GGGGGGGGGGGGGG..',
+        '...HHHHHHHHHHHH...',
+        '....FFFFFFFFFF....'
+      ], map: { G: [C.envelope, '6000 cavity'], H: [C.heat, '12 burners'], F: [C.flame, 'flame'] },
+        legend: [[C.envelope, 'envelope'], [C.heat, 'heat'], [C.flame, 'flame']],
+        cap: '6000 &rarr; 12 burners &rarr; 9000 lift &rarr; &asymp;+7550 net.' },
+      links: [['Studio: balloon 18000 (36 burners, exact)', 'index.html#YjM']] },
+    { t: 'Propeller numbers',
+      n: '<div class="formula">swept disc area = &pi; &times; length&sup2; &nbsp;&middot;&nbsp; diameter = 2 &times; length &nbsp;&middot;&nbsp; bearing = 1 per propeller</div><p>The Propeller tab reports the disc diameter and area, blocks per blade, solidity (how much of the disc the blades cover) and material totals &mdash; everything you need to gather before you build. Mount each propeller on a <code>propeller_bearing</code> fed by a rotating Create shaft; high blade counts love a <code>rotation_speed_controller</code>.</p>',
+      parts: ['aeronautics:propeller_bearing', 'create:rotation_speed_controller'],
+      d: { rows: [
+        '.......W.......',
+        '.....WWWWW.....',
+        '....WWWWWWW....',
+        'WWWWWWWOWWWWWWW',
+        '....WWWWWWW....',
+        '.....WWWWW.....',
+        '.......W.......'
+      ], map: { W: [C.wool, 'blade'], O: [C.hub, 'hub'] },
+        legend: [[C.wool, 'blade'], [C.hub, 'hub']],
+        cap: 'One bearing per propeller, one hub block per disc.' },
+      links: [['Studio: basic propeller', 'index.html#cDM']] },
+    { t: 'The rule in one line',
+      n: '<div class="note good"><b>The rule in one line</b> &mdash; pick the payload you want, add your structure&rsquo;s weight, and size the envelope so that <code>interior &times; 1.5</code> clears it with margin. Then the tab tells you exactly how many burners to hang &mdash; for balloons <i>and</i> crystal shards.</div><p>That&rsquo;s the whole handbook in a sentence. Everything else is doing it.</p>',
+      parts: ['index.html'],
+      d: { rows: [
+        '....GGGGGGGGGGGG....',
+        '...GGGGGGGGGGGGGG...',
+        '..GGGGGGGGGGGGGGGG..',
+        '.GGGGGGGGGGGGGGGGGG.',
+        'GGGGGGGGGGGGGGGGGGGG',
+        '.GGGGGGGGGGGGGGGGGG.',
+        '..GGGGGGGGGGGGGGGG..',
+        '......HHHHHHHH......',
+        '.....BBBBBBBBBB.....'
+      ], map: { G: [C.envelope, 'lift'], H: [C.heat, 'heat'], B: [C.basket, 'payload'] },
+        legend: [[C.envelope, 'lift'], [C.heat, 'heat'], [C.basket, 'payload']],
+        cap: 'Lift with margin, then hang the burners the tab tells you.' },
+      links: [['Studio: hot-air 1000 (2 burners)', 'index.html#YjMuMTUuMTUuMjAuLi4uLi4uLi44Mw']] }
+  ]
+},
+{
+  id: 'components', icon: '&#128230;', title: 'Component Reference', tag: 'the part list',
+  blurb: 'Every useful block id, condensed from the exact jars in this pack.',
+  steps: [
+    { t: 'Create (power &amp; machines)',
+      n: '<p><code>shaft</code> &middot; <code>cogwheel</code> &middot; <code>large_cogwheel</code> &middot; <code>gearbox</code> &middot; <code>gearshift</code> &middot; <code>clutch</code> &middot; <code>encased_chain_drive</code> &middot; <code>rotation_speed_controller</code> &middot; <code>flywheel</code> &middot; <code>water_wheel</code> &middot; <code>large_water_wheel</code> &middot; <code>steam_engine</code> &middot; <code>creative_motor</code> &middot; <code>mechanical_bearing</code> &middot; <code>clockwork_bearing</code> &middot; <code>turntable</code> &middot; <code>rope_pulley</code> &middot; <code>hose_pulley</code> &middot; <code>fluid_tank</code> &middot; <code>fluid_pipe</code> &middot; <code>fluid_valve</code> &middot; <code>mechanical_pump</code> &middot; <code>spout</code> &middot; <code>item_drain</code> &middot; <code>blaze_burner</code> &middot; <code>steam_whistle</code> &middot; <code>radial_chassis</code> &middot; <code>linear_chassis</code> &middot; <code>andesite_casing</code> &middot; <code>brass_casing</code> &middot; <code>copper_casing</code> &middot; <code>industrial_iron_block</code> &middot; <code>sail_frame</code> &middot; 16&times; <code>*_sail</code> &middot; <code>redstone_link</code> &middot; <code>redstone_contact</code> &middot; <code>analog_lever</code> &middot; <code>display_link</code> &middot; <code>nixie_tube</code> &middot; <code>train_door</code> &middot; 16&times; <code>*_seat</code></p>',
+      parts: ['create:steam_engine', 'create:fluid_tank', 'create:andesite_casing'],
+      d: { rows: [
+        '.....CC......',
+        '....CCCC.....',
+        '....CFFC.....',
+        '....CFFC.....',
+        '....CCCC.....',
+        '..SSSSSSSS...',
+        '..SSSSSSSS...'
+      ], map: { C: [C.hull, 'casing'], F: [C.steam, 'fluid tank'], S: [C.shaft, 'shaft'] },
+        legend: [[C.hull, 'casing'], [C.steam, 'fluid tank'], [C.shaft, 'shaft']],
+        cap: 'The Create machine shop: casings, tanks, shafts.' },
+      links: [] },
+    { t: 'Aeronautics (aeronautics + simulated + offroad)',
+      n: '<p><code>adjustable_burner</code> &middot; <code>wooden_propeller</code> &middot; <code>andesite_propeller</code> &middot; <code>smart_propeller</code> &middot; <code>propeller_bearing</code> &middot; <code>gyroscopic_propeller_bearing</code> &middot; 16&times; <code>*_envelope</code> + <code>*_envelope_encased_shaft</code> &middot; <code>levitite</code> &middot; <code>pearlescent_levitite</code> &middot; <code>steam_vent</code> &middot; <code>mounted_potato_cannon</code> &middot; <code>physics_assembler</code> &middot; <code>steering_wheel</code> &middot; <code>throttle_lever</code> &middot; <code>directional_gearshift</code> &middot; <code>analog_transmission</code> &middot; <code>spring</code> &middot; <code>torsion_spring</code> &middot; <code>docking_connector</code> &middot; <code>paired_docking_connector</code> &middot; <code>rope_connector</code> &middot; <code>rope_winch</code> &middot; <code>altitude_sensor</code> &middot; <code>velocity_sensor</code> &middot; <code>gimbal_sensor</code> &middot; <code>optical_sensor</code> &middot; <code>laser_sensor</code> &middot; <code>laser_pointer</code> &middot; <code>modulating_linked_receiver</code> &middot; <code>directional_linked_receiver</code> &middot; <code>linked_typewriter</code> &middot; <code>navigation_table</code> &middot; <code>redstone_accumulator</code> &middot; <code>redstone_inductor</code> &middot; <code>redstone_magnet</code> &middot; 16&times; <code>*_portable_engine</code> &middot; 16&times; <code>*_symmetric_sail</code> &middot; <code>auger_cog</code> &middot; <code>auger_shaft</code> &middot; <code>merging_glue</code> &middot; <code>wheel_mount</code> &middot; <code>borehead_bearing</code> &middot; <code>rockcutting_wheel</code></p>',
+      parts: ['aeronautics:adjustable_burner', 'simulated:physics_assembler', 'simulated:steering_wheel'],
+      d: { rows: [
+        '....GGGGGGGGGGGG....',
+        '...GGGGGGGGGGGGGG...',
+        '..GGGGGGGGGGGGGGGG..',
+        '.GGGGGGGGGGGGGGGGGG.',
+        '.GGGGGGGGGGGGGGGGGG.',
+        '..WW....GGGG....WW..',
+        '......HHHHHHHH......',
+        '.....BBBBBBBBBB.....'
+      ], map: { G: [C.envelope, 'envelope'], W: [C.wool, 'prop'], H: [C.heat, 'heat'], B: [C.basket, 'gondola'] },
+        legend: [[C.envelope, 'envelope'], [C.wool, 'prop'], [C.heat, 'heat'], [C.basket, 'gondola']],
+        cap: 'The aeronautics family: everything a flying machine needs.' },
+      links: [] },
+    { t: 'Propulsion: Simulated &middot; Deep Seas',
+      n: '<p><b>Propulsion: Simulated</b> &mdash; <code>thruster</code> (600 pN, fuel) &middot; <code>ion_thruster</code> (1000 pN, FE) &middot; <code>creative_thruster</code> (10 000 pN) &middot; <code>copycat_wing</code> / <code>copycat_wing_8</code> / <code>copycat_wing_12</code> &middot; <code>tilt_adapter</code> &middot; items: <code>pine_resin</code>, <code>turpentine_bucket</code>.</p><p><b>Deep Seas</b> &mdash; <code>ballast_tank</code> &middot; <code>ballast_vent</code> &middot; <code>copper_pressurizer</code> &middot; <code>iron_pressurizer</code> &middot; <code>electrolyzer</code> &middot; <code>oxygene_diffuser</code> &middot; <code>decompression_chamber</code> &middot; <code>creative_oxygenator</code> &middot; <code>submarine_propeller</code> &middot; <code>water_thruster</code> &middot; <code>barometer</code> &middot; <code>industrial_alarm</code> &middot; <code>arresting_hook</code> &middot; <code>pulley</code> &middot; <code>rockcutting_wheel</code> &middot; <code>underwater_mine</code>.</p>',
+      parts: ['createpropulsionsimulated:thruster', 'create_submarine:ballast_tank'],
+      d: { rows: [
+        '..T.....T..',
+        'HHHHHHHHHHH',
+        '..T.....T..',
+        '..T.....T..',
+        '.....TT....',
+        '....WWW....',
+        '...WWWWW...'
+      ], map: { H: [C.hull, 'hull'], T: [C.thruster, 'thruster'], W: [C.water, 'underwater'] },
+        legend: [[C.hull, 'hull'], [C.thruster, 'thruster'], [C.water, 'underwater drive']],
+        cap: 'Thrust in the air, propulsion under the sea.' },
+      links: [] },
+    { t: 'Transmission &middot; hoses &middot; deco &middot; cannons',
+      n: '<p><code>universal_joint</code> &middot; <code>brass_universal_joint</code> &middot; <code>hydraulic_hinge_head</code> &middot; <code>hydraulic_hinge_link</code> &middot; <code>hydraulic_connection_head</code> &middot; <code>hydraulic_regulator</code> &middot; <code>damping_stress_bearing</code> &mdash; <code>hose_connector</code> &middot; <code>magnet_hose_connector</code> &middot; <code>chain_connector</code> &middot; <code>electric_wire_connector</code> &mdash; hulls/sheet metal/catwalks/supports in 7 metals (<code>createdeco:*_hull</code>, <code>*_sheet_metal</code>, <code>*_catwalk</code>&hellip;) &mdash; cannons: barrels, chambers, breeches, autocannons, ammunition and mounts (<code>createbigcannons:*</code>).</p>',
+      parts: ['vsfluidlink:hose_connector', 'createdeco:industrial_iron_hull', 'createbigcannons:*'],
+      d: { rows: [
+        '..HHHHHHHHHH..',
+        '..H..HH..H.H..',
+        '..HHHHHHHHHH..',
+        '.....CCC......',
+        '...CCCCCCC....'
+      ], map: { H: [C.hull, 'hull'], C: [C.redstone, 'cannon'] },
+        legend: [[C.hull, 'hull'], [C.redstone, 'cannon']],
+        cap: 'Linkage, hoses, hull metal, and the artillery deck.' },
+      links: [] }
+  ]
+},
+{
+  id: 'trouble', icon: '&#128295;', title: 'Troubleshooting', tag: 'when it won&rsquo;t fly',
+  blurb: 'The symptom &rarr; fix table, one step at a time.',
+  steps: [
+    { t: 'Weird rendering, flickering blocks, broken shaders',
+      n: '<p>Aeronautics has <b>known visual issues with Iris</b>. Disable Iris first, then re-test.</p>',
+      parts: ['iris shaders'],
+      d: { rows: [
+        '...!...',
+        '..!!!..',
+        '.!GGG!.',
+        '..!!!..',
+        '...!...'
+      ], map: { G: [C.envelope, 'craft'], '!': [C.redstone, 'glitch'] },
+        legend: [[C.envelope, 'craft'], [C.redstone, 'rendering glitch']],
+        cap: 'Shaders misbehaving? Iris off first.' },
+      links: [] },
+    { t: 'Ship won&rsquo;t lift',
+      n: '<p>Not enough heated volume: 1 burner per 500 blocks, lift = volume &times; 1.5. Check the Balloon/Crystal tab math against your actual block count &mdash; the mass slider may be too low. <b>Crystal ships:</b> enlarge the shard or reduce payload &mdash; the Crystal tab shows exactly how many blocks of heated air you&rsquo;re short. Solid shards have no cavity at all.</p>',
+      parts: ['aeronautics:adjustable_burner'],
+      d: { rows: [
+        '....GGGGG....',
+        '...GGGGGGG...',
+        '..GGGGGGGGG..',
+        '.GGGGGGGGGGG.',
+        'GGGGGGGGGGGGG',
+        '..HHHHHHHHH..',
+        '...FFFFF.....',
+        '.....BBB.....',
+        '.....BBB.....',
+        '.....BBB.....'
+      ], map: { G: [C.envelope, 'envelope'], H: [C.heat, 'heat'], F: [C.flame, 'flame'], B: [C.basket, 'too heavy'] },
+        legend: [[C.envelope, 'envelope'], [C.heat, 'heat'], [C.flame, 'flame'], [C.basket, 'payload']],
+        cap: 'Too heavy or too cold &mdash; the tab math says which.' },
+      links: [['Studio: hot-air 1000', 'index.html#YjMuMTUuMTUuMjAuLi4uLi4uLi44Mw']] },
+    { t: 'Ship lifts but rolls constantly',
+      n: '<p>Asymmetric thrust or mass. Center heavy blocks under the envelope, mirror your thrusters/propellers exactly.</p>',
+      parts: ['createpropulsionsimulated:thruster'],
+      d: { rows: [
+        '..T......T..',
+        '..T..H...T..',
+        'HHHHHHHHHHH.',
+        '..T..H...T..',
+        '..T......T..'
+      ], map: { T: [C.thruster, 'thruster'], H: [C.hull, 'hull'] },
+        legend: [[C.thruster, 'thruster'], [C.hull, 'hull']],
+        cap: 'One missing thruster is all it takes to roll.' },
+      links: [] },
+    { t: 'Propellers do nothing &middot; thrusters won&rsquo;t fire',
+      n: '<p><b>Propellers</b> need a rotating shaft: propeller bearing or a shaft network. Check the bearing&rsquo;s spin direction and that the contraption is assembled.</p><p><b>Thrusters</b>: fuel thrusters need turpentine (250 mB internal tank, pipe more in); ion thrusters need FE (80 FE/t); check the obstruction scan behind the nozzle (10 blocks).</p>',
+      parts: ['aeronautics:propeller_bearing', 'createpropulsionsimulated:thruster'],
+      d: { rows: [
+        '.......W.......',
+        '.....WWWWW.....',
+        'WWWWWWWOWWWWWWW',
+        '.....WWWWW.....',
+        '.......W.......',
+        '.....SSSS......',
+        '.....SSSS......'
+      ], map: { W: [C.wool, 'prop'], O: [C.hub, 'bearing'], S: [C.shaft, 'rotating shaft'] },
+        legend: [[C.wool, 'prop'], [C.hub, 'bearing'], [C.shaft, 'rotating shaft']],
+        cap: 'No shaft, no spin &mdash; no thrust.' },
+      links: [] },
+    { t: 'Ropes disappear after structure-block copy &middot; submarine floods',
+      n: '<p><b>Ropes after NBT copy</b> &mdash; known bug; the pack has <b>Create Aeronautics: Rope Fix</b> available. Install it if you move ships by NBT.</p><p><b>Submarine floods / no air</b> &mdash; check pressurizer placement, seal every hull gap, keep the electrolyzer + oxygen diffuser running. Deep Seas is alpha &mdash; expect quirks.</p>',
+      parts: ['simulated:rope_connector', 'create_submarine:iron_pressurizer'],
+      d: { rows: [
+        '...SS.........',
+        '...SS..BB.....',
+        '..BBBBBBB.....',
+        '.BBBBBBBBB....',
+        'BBBBBBBBBB....'
+      ], map: { S: [C.rope, 'rope'], B: [C.hull, 'hull'] },
+        legend: [[C.rope, 'rope'], [C.hull, 'hull']],
+        cap: 'Ropes and pressure hulls both need fixing &mdash; differently.' },
+      links: [] },
+    { t: 'Pasted blocks face the wrong way &middot; the Lab won&rsquo;t open my file',
+      n: '<p><b>Wrong orientation after paste</b> &mdash; the studio writes real <code>Properties</code> (axis/facing) into schematics. If you mirror the paste, re-check facing by hand &mdash; mirroring doesn&rsquo;t flip every state automatically.</p><p><b>Lab rejects a file</b> &mdash; it reads Sponge v2 / structure / Litematica files (<code>.schem</code> / <code>.nbt</code> / <code>.litematic</code>), gzipped or raw &mdash; including the studio&rsquo;s own exports. Old-format and modern NBT list layouts are both accepted.</p><p class="dim" style="color:var(--faint); font-size:12.5px">Disabled mods in this pack (skipped by the loader): Gravestone, LitematicaTool, TinyCreate, Create: Simulated Additions. Don&rsquo;t design against them &mdash; the studio never does.</p>',
+      parts: ['index.html'],
+      d: { rows: [
+        'GGGG..WWW..CCC',
+        'GGGG..WWW..CCC',
+        'GGGG..WWW..CCC',
+        '....HHHHH..CCC',
+        '....HHHHH..CCC',
+        '....HHHHH..CCC'
+      ], map: { G: [C.envelope, 'balloon'], W: [C.wool, 'prop'], C: [C.amethyst, 'crystal'], H: [C.hull, 'lab'] },
+        legend: [[C.envelope, 'balloon'], [C.wool, 'prop'], [C.amethyst, 'crystal'], [C.hull, 'lab']],
+        cap: 'The studio and the lab speak the same NBT dialect.' },
+      links: [['Open the studio (Lab tab inside)', 'index.html#YjM']] }
+  ]
+}
+];
+
+/* ================= ponder player ================= */
+var viewIndex = document.getElementById('view-index');
+var viewScene = document.getElementById('view-scene');
+var sceneGrid = document.getElementById('scene-grid');
+var cur = { scene: -1, step: 0, timer: null, playing: false };
+var PLAY_MS = 2800;
+
+function el(id) { return document.getElementById(id); }
+
+/* ---- index ---- */
+(function renderIndex() {
+  var html = '';
+  for (var i = 0; i < SCENES.length; i++) {
+    var s = SCENES[i];
+    html += '<div class="scene-card" data-i="' + i + '">' +
+      '<div class="icon">' + s.icon + '</div>' +
+      '<h3>' + s.title + '</h3>' +
+      '<p>' + s.blurb + '</p>' +
+      '<div class="meta"><span>' + s.steps.length + ' steps</span><span class="start">Start &#9654;</span></div>' +
+      '</div>';
+  }
+  sceneGrid.innerHTML = html;
+  var cards = sceneGrid.children;
+  for (var c = 0; c < cards.length; c++) {
+    cards[c].onclick = (function (i) {
+      return function () { openScene(i); };
+    })(c);
+  }
+})();
+
+/* ---- diagram renderer ---- */
+function renderDiagram(d) {
+  if (!d) return '';
+  var width = 0;
+  for (var r = 0; r < d.rows.length; r++) width = Math.max(width, d.rows[r].length);
+  var cells = '';
+  for (var y = 0; y < d.rows.length; y++) {
+    var row = d.rows[y];
+    for (var x = 0; x < width; x++) {
+      var ch = row.charAt(x);
+      if (ch === '.' || ch === ' ') {
+        cells += '<span class="cell f"></span>';
+      } else {
+        var m = d.map[ch] || [null, ''];
+        cells += '<span class="cell" title="' + m[1] + '" style="background:' + m[0] + '"></span>';
+      }
+    }
+  }
+  var legend = '';
+  if (d.legend && d.legend.length) {
+    for (var l = 0; l < d.legend.length; l++) {
+      legend += '<span><i style="background:' + d.legend[l][0] + '"></i>' + d.legend[l][1] + '</span>';
+    }
+  }
+  return '<div class="diagram" style="grid-template-columns:repeat(' + width + ',15px)">' + cells + '</div>' +
+    (legend ? '<div class="legend">' + legend + '</div>' : '');
+}
+
+/* ---- scene player ---- */
+function stopPlay() {
+  cur.playing = false;
+  if (cur.timer) { clearTimeout(cur.timer); cur.timer = null; }
+  el('btn-play').innerHTML = '&#9654; Play';
+}
+
+function openScene(i) {
+  var s = SCENES[i];
+  if (!s) return;
+  cur.scene = i;
+  cur.step = 0;
+  stopPlay();
+  viewIndex.classList.add('hidden');
+  viewScene.classList.remove('hidden');
+  el('sc-kicker').textContent = 'Ponder &middot; scene ' + (i + 1) + ' of ' + SCENES.length;
+  el('sc-title').textContent = s.title;
+  el('sc-tag').textContent = s.tag;
+  el('hdr-index').textContent = 'Index';
+  window.scrollTo(0, 0);
+  location.hash = '#' + s.id;
+  showStep(0);
+}
+
+function showStep(n) {
+  var s = SCENES[cur.scene];
+  if (n < 0) n = 0;
+  if (n > s.steps.length - 1) {
+    n = s.steps.length - 1;
+    stopPlay();
+  }
+  cur.step = n;
+  var st = s.steps[n];
+  var last = n === s.steps.length - 1;
+  /* stepbar */
+  var bar = '';
+  for (var i = 0; i < s.steps.length; i++) {
+    var cls = i < n ? 'done' : (i === n ? 'cur' : '');
+    bar += '<span class="seg ' + cls + '" data-step="' + i + '"></span>';
+  }
+  el('stepbar').innerHTML = bar;
+  var segs = el('stepbar').children;
+  for (var g = 0; g < segs.length; g++) {
+    segs[g].onclick = (function (si) {
+      return function () { stopPlay(); showStep(si); };
+    })(g);
+  }
+  /* narration */
+  el('st-title').innerHTML = '<span class="stepnum">' + (n + 1) + ' / ' + s.steps.length + '</span>' + st.t;
+  el('st-text').innerHTML = st.n;
+  /* key blocks */
+  var chips = '';
+  for (var k = 0; k < (st.parts || []).length; k++) {
+    chips += '<span class="chip">' + st.parts[k] + '</span>';
+  }
+  el('st-chips').innerHTML = chips;
+  el('st-parts').classList.toggle('hidden', !chips);
+  /* try-it links */
+  var links = '';
+  for (var l = 0; l < (st.links || []).length; l++) {
+    links += '<a class="golink" href="' + st.links[l][1] + '">&#9654; ' + st.links[l][0] + '</a>';
+  }
+  el('st-links').innerHTML = links;
+  el('st-try').classList.toggle('hidden', !links);
+  /* diagram */
+  el('st-stage').innerHTML = renderDiagram(st.d);
+  el('st-cap').textContent = (st.d && st.d.cap) || '';
+  /* controls */
+  el('st-counter').textContent = (n + 1) + ' / ' + s.steps.length;
+  el('btn-prev').disabled = n === 0;
+  el('btn-next').disabled = last;
+  el('btn-next').textContent = last ? 'Scene complete' : 'Next &#9654;';
+  /* completion banner: what to do next */
+  var banner = '';
+  if (last) {
+    var nx = cur.scene + 1 < SCENES.length ? SCENES[cur.scene + 1] : null;
+    banner = '<div class="note good complete-banner" style="padding:12px 16px"><b>Scene complete.</b> ' +
+      (nx ? 'Continue with <a class="golink" style="margin-left:8px" href="#' + nx.id + '" onclick="window.openSceneByName(&#39;' + nx.id + '&#39;); return false;">&#9654; ' + nx.title + '</a>' : 'That&rsquo;s the whole handbook &mdash; go fly something. <a class="golink" style="margin-left:8px" href="index.html">&#9654; Open the studio</a>') +
+      '</div>';
+  }
+  document.getElementById('complete-banner').innerHTML = banner;
+}
+
+window.openSceneByName = function (id) {
+  for (var i = 0; i < SCENES.length; i++) {
+    if (SCENES[i].id === id) { openScene(i); return; }
+  }
+  showIndex();
+};
+
+function showIndex() {
+  stopPlay();
+  viewScene.classList.add('hidden');
+  viewIndex.classList.remove('hidden');
+  el('hdr-index').textContent = 'Index';
+  if (location.hash) history.replaceState(null, '', location.pathname);
+  window.scrollTo(0, 0);
+}
+
+function nextStep() {
+  var s = SCENES[cur.scene];
+  if (cur.step < s.steps.length - 1) showStep(cur.step + 1);
+  else stopPlay();
+}
+function prevStep() {
+  if (cur.step > 0) { stopPlay(); showStep(cur.step - 1); }
+}
+
+el('btn-prev').onclick = prevStep;
+el('btn-next').onclick = function () {
+  stopPlay();
+  nextStep();
+};
+el('btn-index').onclick = showIndex;
+el('hdr-index').onclick = function (e) {
+  if (viewScene.classList.contains('hidden')) return;
+  e.preventDefault();
+  showIndex();
+};
+el('btn-reset').onclick = function () {
+  stopPlay();
+  showStep(0);
+};
+el('btn-play').onclick = function () {
+  if (cur.playing) { stopPlay(); return; }
+  var s = SCENES[cur.scene];
+  if (cur.step >= s.steps.length - 1) showStep(0);
+  cur.playing = true;
+  el('btn-play').innerHTML = '&#10074;&#10074; Pause';
+  var tick = function () {
+    if (!cur.playing) return;
+    var s2 = SCENES[cur.scene];
+    if (cur.step < s2.steps.length - 1) {
+      showStep(cur.step + 1);
+      cur.timer = setTimeout(tick, PLAY_MS);
+    } else {
+      stopPlay();
+    }
+  };
+  cur.timer = setTimeout(tick, PLAY_MS);
+};
+
+document.addEventListener('keydown', function (e) {
+  if (viewScene.classList.contains('hidden')) return;
+  if (e.key === 'ArrowRight') nextStep();
+  else if (e.key === 'ArrowLeft') prevStep();
+  else if (e.key === ' ') { e.preventDefault(); el('btn-play').onclick(); }
+});
+
+/* deep-link: #sceneId opens that scene (fresh loads AND same-page links) */
+function routeScene() {
+  var h = location.hash.replace(/^#/, '');
+  if (h && /^[a-z-]+$/.test(h)) {
+    for (var i = 0; i < SCENES.length; i++) {
+      if (SCENES[i].id === h) { openScene(i); return; }
+    }
+  }
+}
+window.addEventListener('hashchange', routeScene);
+routeScene();
+</script>
+</body>
+</html>

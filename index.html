@@ -327,7 +327,7 @@
   <button class="hbtn" id="guide-btn">Guide</button>
   <button class="hbtn" id="share-btn">Copy link</button>
   <label class="chk" title="Adds a single sea-lantern block at the model's center to the .nbt / .litematic export — a visible center reference when you paste">
-    <input type="checkbox" id="cb-center"> Center block</label>
+    <input type="checkbox" id="cb-center" checked> Center block</label>
   <button class="hbtn" id="nbt-btn" title="Litematica schematic (.litematic) — load it straight into Litematica / Forgematica">.litematic</button>
   <button class="hbtn primary" id="dl-btn" title="Create schematic (.nbt) — gzipped structure NBT for Create's Schematicannon">⬇ .nbt</button>
 </header>
@@ -1897,12 +1897,15 @@ function buildSchematic(r, p) {
   var minX = r.minX, minY = r.minY, minZ = r.minZ;
   var sx = r.maxX - minX + 1, sy = r.maxY - minY + 1, sz = r.maxZ - minZ + 1;
   var names = [], nameToState = {};
-  /* optional singular center block: a sea lantern at the middle of the bbox,
+  /* optional singular center block: a sea lantern at the model's center,
      so pasted builds carry a visible center reference (replaces whatever
-     block already sits there) */
+     block already sits there). Generators that know their INTERNAL center
+     (the crystal's widest cross-section) pin the marker there. */
   var addCenter = false;
   try { addCenter = !!document.getElementById('cb-center').checked; } catch (e) {}
-  var cxc = Math.floor((r.minX + r.maxX) / 2), cyc = Math.floor((r.minY + r.maxY) / 2), czc = Math.floor((r.minZ + r.maxZ) / 2);
+  var cxc = r.center ? r.center.x : Math.floor((r.minX + r.maxX) / 2);
+  var cyc = r.center ? r.center.y : Math.floor((r.minY + r.maxY) / 2);
+  var czc = r.center ? r.center.z : Math.floor((r.minZ + r.maxZ) / 2);
   var w = new NBTWriter();
   w.u8(10); w.i16(0);                       // root compound, no name
   w.intField('DataVersion', 3955);
@@ -1961,7 +1964,9 @@ function buildLitematic(r, p, name) {
   var vol = sx * sy * sz;
   var addCenter = false;
   try { addCenter = !!document.getElementById('cb-center').checked; } catch (e) {}
-  var cxc = Math.floor((r.minX + r.maxX) / 2), cyc = Math.floor((r.minY + r.maxY) / 2), czc = Math.floor((r.minZ + r.maxZ) / 2);
+  var cxc = r.center ? r.center.x : Math.floor((r.minX + r.maxX) / 2);
+  var cyc = r.center ? r.center.y : Math.floor((r.minY + r.maxY) / 2);
+  var czc = r.center ? r.center.z : Math.floor((r.minZ + r.maxZ) / 2);
   var palKeys = [], nameToState = {};
   var cells = new Int32Array(vol);
   cells.fill(-1);

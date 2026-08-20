@@ -438,6 +438,67 @@ test('crystal: inclusion variants — glass patches with their own shares and ty
   assert.strictEqual(Gen.genCrystal({ inclusions: [{ material: 'glass', pct: 0 }], crackCount: 0 }).inclusionTotal, 0);
 });
 
+test('crystal: the hull is ONE face-connected piece — nothing floats loose', () => {
+  /* in game the assembler only joins face-connected blocks, so the emitted
+     hull must be a single 6-connected component: the end points (and every
+     other block) stay attached to the ship */
+  const components = (r) => {
+    const X = r.maxX - r.minX + 1, Y = r.maxY - r.minY + 1, Z = r.maxZ - r.minZ + 1;
+    const YZ = Y * Z;
+    const grid = new Uint8Array(X * Y * Z);
+    for (let i = 0; i < r.count; i++) {
+      const x = r.positions[i * 3] - r.minX, y = r.positions[i * 3 + 1] - r.minY, z = r.positions[i * 3 + 2] - r.minZ;
+      grid[x * YZ + y * Z + z] = 1;
+    }
+    const sid = new Int32Array(X * Y * Z);
+    const sizes = [];
+    let nc = 0;
+    for (let i = 0; i < X * Y * Z; i++) {
+      if (!grid[i] || sid[i]) continue;
+      nc++;
+      const qq = [i];
+      sid[i] = nc;
+      let c = 0;
+      while (qq.length) {
+        const k = qq.pop(); c++;
+        const x = (k / YZ) | 0, rem = k - x * YZ, y = (rem / Z) | 0, z = rem - y * Z;
+        const nb = [];
+        if (x > 0) nb.push(k - YZ); if (x < X - 1) nb.push(k + YZ);
+        if (y > 0) nb.push(k - Z); if (y < Y - 1) nb.push(k + Z);
+        if (z > 0) nb.push(k - 1); if (z < Z - 1) nb.push(k + 1);
+        for (const n of nb) if (grid[n] && !sid[n]) { sid[n] = nc; qq.push(n); }
+      }
+      sizes.push(c);
+    }
+    return sizes;
+  };
+  for (const p of [
+    {},
+    { heightY: 127 },
+    { heightY: 127, seed: 42 },
+    { heightY: 127, crackCount: 8, seed: 77 },
+    { jitter: 0.4, twistDeg: 90, leanZ: 2, seed: 7 },
+    { orientation: 'vertical', jitter: 0.3, twistDeg: 120, leanX: 4, crackCount: 10, seed: 999, heightY: 36, baseDiagX: 14, baseDiagZ: 10, centerMode: 'even' },
+    { shell: 3, jitter: 0.4, crackCount: 12, twistDeg: 90, leanX: 5, leanZ: 3, asym: 0.3, seed: 42 },
+  ]) {
+    const r = Gen.genCrystal(p);
+    const comps = components(r);
+    assert.strictEqual(comps.length, 1, `one connected hull for ${JSON.stringify(p)}: ${JSON.stringify(comps)}`);
+  }
+});
+
+test('crystal: the requested length is exact and the internal center is reported', () => {
+  /* a 127-length shard must paste as 127 blocks — the tips are part of the
+     connected hull, so the assembler keeps every block */
+  const r = Gen.genCrystal({ heightY: 127 });
+  assert.strictEqual(r.maxX - r.minX + 1, 127, '127 long exactly');
+  /* the center marker target: the middle of the long axis at the widest
+     cross-section, in emitted coordinates */
+  assert.ok(r.center && r.center.x === 63 && r.center.y >= 0 && r.center.z >= 0, JSON.stringify(r.center));
+  const u = Gen.genCrystal({ orientation: 'vertical', heightY: 127, leanX: 0 });
+  assert.ok(u.center && u.center.y === 63, JSON.stringify(u.center));
+});
+
 /* ---------- shapes ---------- */
 test('shapes: every primitive generates, with sane hollow interiors', () => {
   for (const kind of ['sphere', 'cylinder', 'cone', 'pyramid', 'torus', 'dome']) {

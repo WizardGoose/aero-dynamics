@@ -662,6 +662,7 @@
     }
 
     var solid = 0;
+    var rMaxByY = new Float64Array(Y);   /* per-slice radius — cracks must not carve the thin tips */
     for (var y = 0; y < Y; y++) {
       var t = y / Math.max(1, H - 1);
       var f = shapeF(t);
@@ -679,9 +680,17 @@
         vz[i2] = czp + RZ * Math.sin(a) * rj;
       }
       var rMax = Math.max(RX, RZ) * (1 + jitter);
-      if (rMax < 0.45) {
-        /* sharp tip: a single center block, so the shard truly comes to a point */
-        var gx0 = clamp(Math.round(cxp), 0, X - 1), gz0 = clamp(Math.round(czp), 0, Z - 1);
+      rMaxByY[y] = rMax;
+
+      if (rMax < 1.05) {   /* below ~1 cell the polygon fill and the single-cell
+         branch could disagree on the center cell and zig-zag the tip into
+         diagonal-only contacts — keep the whole thin tip one chain */
+        /* sharp tip: a single center block, so the shard truly comes to a
+           point. The tip is the cell CONTAINING the slice center (floor) —
+           one block over from the rounded cell — which lines the point up
+           with the body's center column: the chain joins the hull face-first
+           with no extra bridging block. */
+        var gx0 = clamp(Math.floor(cxp), 0, X - 1), gz0 = clamp(Math.floor(czp), 0, Z - 1);
         var ti = idx(gx0, y, gz0);
         if (!grid[ti]) { grid[ti] = 1; solid++; }
         continue;
@@ -709,10 +718,32 @@
        solid from the surface. The hull is peeled AFTER the carving, so every
        crack becomes a sealed groove — its walls are the new hull — and the
        cavity can never vent. ---- */
+    /* how deep each solid cell sits below the open surface — cracks carve
+       only the shell layers, never into the cavity core */
+    var crackDepth = hollow ? shell : 1;
     var surfCells = [];
+    var surfDepth = new Int16Array(total);
+    var depthFrontier = [];
     for (var s2 = 0; s2 < total; s2++) {
       if (!grid[s2]) continue;
-      if (!grid[s2 - Y * Z] || !grid[s2 + Y * Z] || !grid[s2 - Z] || !grid[s2 + Z] || !grid[s2 - 1] || !grid[s2 + 1]) surfCells.push(s2);
+      var sx3 = (s2 / (Y * Z)) | 0, srm3 = s2 - sx3 * Y * Z, sy3 = (srm3 / Z) | 0, sz3 = srm3 - sy3 * Z;
+      var onSurf = (sx3 === 0 || sx3 === X - 1 || sy3 === 0 || sy3 === Y - 1 || sz3 === 0 || sz3 === Z - 1) ||
+        !grid[s2 - Y * Z] || !grid[s2 + Y * Z] || !grid[s2 - Z] || !grid[s2 + Z] || !grid[s2 - 1] || !grid[s2 + 1];
+      if (onSurf) { surfCells.push(s2); surfDepth[s2] = 1; depthFrontier.push(s2); }
+    }
+    for (var depth = 2; depth <= crackDepth; depth++) {
+      var nextFrontier = [];
+      for (var df = 0; df < depthFrontier.length; df++) {
+        var d0 = depthFrontier[df];
+        var dx0 = (d0 / (Y * Z)) | 0, drm = d0 - dx0 * Y * Z, dy0 = (drm / Z) | 0, dz0 = drm - dy0 * Z;
+        if (dx0 > 0) { var dn1 = d0 - Y * Z; if (grid[dn1] && !surfDepth[dn1]) { surfDepth[dn1] = depth; nextFrontier.push(dn1); } }
+        if (dx0 < X - 1) { var dn2 = d0 + Y * Z; if (grid[dn2] && !surfDepth[dn2]) { surfDepth[dn2] = depth; nextFrontier.push(dn2); } }
+        if (dy0 > 0) { var dn3 = d0 - Z; if (grid[dn3] && !surfDepth[dn3]) { surfDepth[dn3] = depth; nextFrontier.push(dn3); } }
+        if (dy0 < Y - 1) { var dn4 = d0 + Z; if (grid[dn4] && !surfDepth[dn4]) { surfDepth[dn4] = depth; nextFrontier.push(dn4); } }
+        if (dz0 > 0) { var dn5 = d0 - 1; if (grid[dn5] && !surfDepth[dn5]) { surfDepth[dn5] = depth; nextFrontier.push(dn5); } }
+        if (dz0 < Z - 1) { var dn6 = d0 + 1; if (grid[dn6] && !surfDepth[dn6]) { surfDepth[dn6] = depth; nextFrontier.push(dn6); } }
+      }
+      depthFrontier = nextFrontier;
     }
     var crackOrigins = [];
     for (var ck = 0; ck < crackCount; ck++) {
@@ -733,6 +764,10 @@
           for (var czz = cz0b; czz <= cz1b; czz++) {
             var c = cxx * Y * Z + cyy * Z + czz;
             if (!grid[c]) continue;
+            /* never carve the thin tip zones — the end points must stay connected */
+            if (rMaxByY[cyy] < 2) continue;
+            /* carve only the shell layers, never into the cavity core */
+            if (surfDepth[c] < 1 || surfDepth[c] > crackDepth) continue;
             var rx = cxx - ox, ry = cyy - oy, rz = czz - oz;
             var proj = rx * dx + ry * dy + rz * dz;
             if (proj < 0 || proj > clen) continue;
@@ -748,10 +783,9 @@
       if (removed) crackOrigins.push(o);
     }
 
-    /* ---- airtight seal: any sealed air pocket left inside the solid (a
+    /* ---- airtight seal #1: any sealed air pocket left inside the solid (a
        rasterization bubble, or a crack that never reached the surface) is
-       filled with crystal. After this the ONLY air inside the shard is the
-       cavity itself — no stray gaps, nothing to leak. ---- */
+       filled with crystal before the hull is peeled. ---- */
     var pocketsFilled = 0;
     var bubbleFills = [];
     var sealLab = airLabels(grid, X, Y, Z);
@@ -776,23 +810,136 @@
       hullMask = grid;
     }
     for (var h = 0; h < total; h++) if (hullMask[h]) hullCells.push(h);
+    var hullSet = new Uint8Array(total);
+    for (var hc = 0; hc < hullCells.length; hc++) hullSet[hullCells[hc]] = 1;
     /* repair cells added below are buried inside the hull — they are
        emitted as crystal (so no air pocket survives in the built shard)
        but excluded from inclusion patches (patches must stay visible) */
     var sealedFill = new Uint8Array(total);
     if (hollow) {
       for (var bf = 0; bf < bubbleFills.length; bf++) {
+        hullSet[bubbleFills[bf]] = 1;
         hullCells.push(bubbleFills[bf]);
         sealedFill[bubbleFills[bf]] = 1;
       }
-      /* stranded core pieces: a deep crack can pinch the cavity in two.
-         Fill every core piece except the largest with crystal, so the
-         ship's cavity stays one connected air region and no air gap is
-         left unconnected. */
+    }
+
+    /* add a cell to the hull: existing solid (buried core) is just emitted,
+       open air becomes fresh crystal */
+    var bridgeCell = function (m) {
+      if (hullSet[m]) return false;
+      if (!grid[m]) { grid[m] = 1; solid++; }
+      hullSet[m] = 1;
+      hullCells.push(m);
+      return true;
+    };
+    /* connect the hull: the skin must be ONE face-connected piece, or the
+       assembler cannot join it (diagonal-only contacts fall apart in game).
+       Bridge junctions between DIFFERENT 6-connected pieces only — a full
+       diagonal closure would chain into the cavity and fill it. */
+    var closeHull = function () {
+      var bridged = 0;
+      for (var pass = 0; pass < 8; pass++) {
+        /* union-find over hull cells: face-adjacent cells are unioned first,
+           so the find() components are exactly the 6-connected pieces */
+        var parent = new Int32Array(total);
+        var find = function (a) {
+          var root = a;
+          while (parent[root] !== root) root = parent[root];
+          while (parent[a] !== root) { var nxt = parent[a]; parent[a] = root; a = nxt; }
+          return root;
+        };
+        for (var hc2 = 0; hc2 < hullCells.length; hc2++) parent[hullCells[hc2]] = hullCells[hc2];
+        var union = function (a, b) {
+          var ra = find(a), rb = find(b);
+          if (ra !== rb) parent[ra] = rb;
+        };
+        for (var hc2b = 0; hc2b < hullCells.length; hc2b++) {
+          var cc0 = hullCells[hc2b];
+          var cx6 = (cc0 / (Y * Z)) | 0, crm6 = cc0 - cx6 * Y * Z, cy6 = (crm6 / Z) | 0, cz6 = crm6 - cy6 * Z;
+          var cnbs6 = [];
+          if (cx6 > 0) cnbs6.push(cc0 - Y * Z);
+          if (cx6 < X - 1) cnbs6.push(cc0 + Y * Z);
+          if (cy6 > 0) cnbs6.push(cc0 - Z);
+          if (cy6 < Y - 1) cnbs6.push(cc0 + Z);
+          if (cz6 > 0) cnbs6.push(cc0 - 1);
+          if (cz6 < Z - 1) cnbs6.push(cc0 + 1);
+          for (var cn6 = 0; cn6 < cnbs6.length; cn6++) {
+            if (hullSet[cnbs6[cn6]]) union(cc0, cnbs6[cn6]);
+          }
+        }
+        /* bridge diagonal junctions between different pieces: one bridge per
+           merge (a spanning set, not a full closure) — prefer open-air cells
+           so the cavity keeps its volume */
+        var passBridged = 0;
+        for (var hc3 = 0; hc3 < hullCells.length; hc3++) {
+          var bc = hullCells[hc3];
+          var bx5 = (bc / (Y * Z)) | 0, brm = bc - bx5 * Y * Z, by5 = (brm / Z) | 0, bz5 = brm - by5 * Z;
+          for (var ox5 = -1; ox5 <= 1; ox5++) {
+            var nx5 = bx5 + ox5;
+            if (nx5 < 0 || nx5 >= X) continue;
+            for (var oy5 = -1; oy5 <= 1; oy5++) {
+              var ny5 = by5 + oy5;
+              if (ny5 < 0 || ny5 >= Y) continue;
+              for (var oz5 = -1; oz5 <= 1; oz5++) {
+                var nz5 = bz5 + oz5;
+                if (nz5 < 0 || nz5 >= Z) continue;
+                if (!ox5 && !oy5 && !oz5) continue;
+                if (!(ox5 * oy5 || ox5 * oz5 || oy5 * oz5)) continue;
+                var nc3 = nx5 * Y * Z + ny5 * Z + nz5;
+                if (!hullSet[nc3]) continue;
+                if (find(bc) === find(nc3)) continue;
+                var m1 = (bx5 + ox5) * Y * Z + by5 * Z + bz5;
+                var m2 = bx5 * Y * Z + (by5 + oy5) * Z + bz5;
+                var m3 = bx5 * Y * Z + by5 * Z + (bz5 + oz5);
+                var join = function (a, b) { union(a, b); union(bc, a); };
+                var br = function (m) { if (bridgeCell(m)) parent[m] = m; };
+                var m4 = (bx5 + ox5) * Y * Z + (by5 + oy5) * Z + bz5;
+                /* only bridge across OPEN air (the outside surface or a
+                   crack groove) — a cavity-side step must never be bridged,
+                   or the bridges would eat the cavity block by block */
+                if (grid[m1] && grid[m2] && grid[m3] && grid[m4]) continue;
+                if (ox5 && oy5 && oz5) {
+                  br(m1);
+                  br(m4);
+                  if (hullSet[m1] && hullSet[m4]) join(m1, m4);
+                } else if (ox5 && oy5) {
+                  if (!hullSet[m1] && !grid[m1]) br(m1);
+                  if (!hullSet[m1] && !hullSet[m2]) br(m2);
+                  if (hullSet[m1]) join(m1, bc);
+                  else if (hullSet[m2]) join(m2, bc);
+                } else if (ox5 && oz5) {
+                  if (!hullSet[m1] && !grid[m1]) br(m1);
+                  if (!hullSet[m1] && !hullSet[m3]) br(m3);
+                  if (hullSet[m1]) join(m1, bc);
+                  else if (hullSet[m3]) join(m3, bc);
+                } else {
+                  if (!hullSet[m2] && !grid[m2]) br(m2);
+                  if (!hullSet[m2] && !hullSet[m3]) br(m3);
+                  if (hullSet[m2]) join(m2, bc);
+                  else if (hullSet[m3]) join(m3, bc);
+                }
+                union(bc, nc3);
+                passBridged++;
+              }
+            }
+          }
+        }
+        bridged += passBridged;
+        if (!passBridged) break;
+      }
+      return bridged;
+    };
+        /* stranded core pieces: a deep crack (or a bridge wall) can pinch the
+       cavity in two. Fill every core piece except the largest with crystal,
+       so the ship's cavity stays one connected air region and no air gap is
+       left unconnected. */
+    var fillStranded = function () {
+      var filled = 0;
       var coreId = new Int32Array(total);
       var coreSizes = [];
       for (var q3 = 0; q3 < total; q3++) {
-        if (!grid[q3] || hullMask[q3] || coreId[q3]) continue;
+        if (!grid[q3] || hullSet[q3] || coreId[q3]) continue;
         var cid = coreSizes.length + 1;
         var cstack = [q3];
         coreId[q3] = cid;
@@ -809,7 +956,7 @@
           if (cz4 < Z - 1) cnbs.push(cc2 + 1);
           for (var cn = 0; cn < cnbs.length; cn++) {
             var cnb = cnbs[cn];
-            if (grid[cnb] && !hullMask[cnb] && !coreId[cnb]) { coreId[cnb] = cid; cstack.push(cnb); }
+            if (grid[cnb] && !hullSet[cnb] && !coreId[cnb]) { coreId[cnb] = cid; cstack.push(cnb); }
           }
         }
         coreSizes.push(csz);
@@ -820,12 +967,81 @@
       }
       for (var q4 = 0; q4 < total; q4++) {
         if (coreId[q4] && coreId[q4] !== mainCore) {
+          hullSet[q4] = 1;
           hullCells.push(q4);
           sealedFill[q4] = 1;
           pocketsFilled++;
+          filled++;
         }
       }
+      return filled;
+    };
+    /* drop floating chips (a crack can split off a shard) — keep only the
+       main body, so nothing floats loose from the ship */
+    var dropChips = function () {
+      var compLab2 = new Int32Array(total);
+      var compSizes2 = [];
+      for (var fc3 = 0; fc3 < hullCells.length; fc3++) {
+        var fc4 = hullCells[fc3];
+        if (compLab2[fc4]) continue;
+        var cid2 = compSizes2.length + 1;
+        var fstack2 = [fc4];
+        compLab2[fc4] = cid2;
+        var csz2 = 0;
+        while (fstack2.length) {
+          var fc5 = fstack2.pop(); csz2++;
+          var fx2 = (fc5 / (Y * Z)) | 0, frm2 = fc5 - fx2 * Y * Z, fy2 = (frm2 / Z) | 0, fz2 = frm2 - fy2 * Z;
+          var fnbs2 = [];
+          if (fx2 > 0) fnbs2.push(fc5 - Y * Z);
+          if (fx2 < X - 1) fnbs2.push(fc5 + Y * Z);
+          if (fy2 > 0) fnbs2.push(fc5 - Z);
+          if (fy2 < Y - 1) fnbs2.push(fc5 + Z);
+          if (fz2 > 0) fnbs2.push(fc5 - 1);
+          if (fz2 < Z - 1) fnbs2.push(fc5 + 1);
+          for (var fn2 = 0; fn2 < fnbs2.length; fn2++) {
+            var fnb2 = fnbs2[fn2];
+            if (hullSet[fnb2] && !compLab2[fnb2]) { compLab2[fnb2] = cid2; fstack2.push(fnb2); }
+          }
+        }
+        compSizes2.push(csz2);
+      }
+      var mainId2 = 0, mainSize2 = 0;
+      for (var mc2 = 0; mc2 < compSizes2.length; mc2++) {
+        if (compSizes2[mc2] > mainSize2) { mainSize2 = compSizes2[mc2]; mainId2 = mc2 + 1; }
+      }
+      if (mainId2) {
+        for (var dc = hullCells.length - 1; dc >= 0; dc--) {
+          var dc0 = hullCells[dc];
+          if (compLab2[dc0] && compLab2[dc0] !== mainId2) {
+            grid[dc0] = 0;
+            hullSet[dc0] = 0;
+            solid--;
+            hullCells.splice(dc, 1);
+          }
+        }
+      }
+    };
+
+    /* seal-and-connect: repeat bridging + stranded fills until stable, then
+       drop chips and refill any air pocket the bridges walled off */
+    for (var cycle = 0; cycle < 4; cycle++) {
+      if (!hollow) { closeHull(); dropChips(); break; }
+      if (!closeHull() && !fillStranded()) break;
     }
+    closeHull();
+    dropChips();
+    var sealLab2 = airLabels(grid, X, Y, Z);
+    for (var q5 = 0; q5 < total; q5++) {
+      if (sealLab2[q5] === 2) {
+        grid[q5] = 1;
+        solid++;
+        pocketsFilled++;
+        hullSet[q5] = 1;
+        hullCells.push(q5);
+        sealedFill[q5] = 1;
+      }
+    }
+
     var hullCount = hullCells.length;
     var cellType = new Uint8Array(total);   /* 0 none, 1 crystal, 2+ inclusion variant */
     for (var h2 = 0; h2 < hullCells.length; h2++) cellType[hullCells[h2]] = 1;
@@ -914,6 +1130,16 @@
     if (yShift) for (var e2 = 0; e2 < nCells; e2++) positions[e2 * 3 + 1] += yShift;
     minY += yShift; maxY += yShift;
 
+    /* the shard's INTERNAL center — the middle of the long axis at the
+       widest cross-section. The NBT center marker goes here, so the pasted
+       crystal carries its true center reference. */
+    var cT = 0.5;
+    var cDip = Math.round(leanX * cT);
+    var cix = Math.floor(cx0 + (lying ? -cDip : cDip));
+    var ciy = Math.floor((H - 1) / 2);
+    var ciz = Math.floor(cz0 + leanZ * cT);
+    var centerCell = lying ? { x: ciy, y: cix + yShift, z: ciz } : { x: cix, y: ciy + yShift, z: ciz };
+
     var solidPositions = null;
     if (p.includeSolid && solid <= 2000000) {
       solidPositions = new Int16Array(solid * 3);
@@ -952,6 +1178,7 @@
       wool: 0, logs: 0, planks: 0,
       minX: minX, minY: minY, minZ: minZ, maxX: maxX, maxY: maxY, maxZ: maxZ,
       hollow: hollow,
+      center: centerCell,
       crystalCount: crystalCount, inclusionTotal: inclusionTotal, cracksMade: cracksMade, inclusionPct: inclusionPct,
       inclusions: variants.map(function (vv) { return { material: vv.material, pct: vv.pct, count: vv.count }; }),
       pocketsFilled: pocketsFilled,

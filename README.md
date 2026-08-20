@@ -204,6 +204,10 @@ npm test                        # node --test, no dependencies
   outside), so you can add them after picking a size.
 - Crystal interior = solid − hull (cracks are sealed grooves, so they never open the cavity;
   stray rasterization air pockets are filled with crystal; a solid shard has no cavity).
+- The hull is one face-connected piece — every tip and bridge is attached, so the assembler
+  joins the whole shard (nothing floats loose, the requested length is exact in game).
+- The optional center block (sea lantern, on by default) is placed at the shard's INTERNAL
+  center — the middle of the long axis at the widest cross-section.
   `interior + crystal + inclusions = solid` always holds for hollow shards — the tests
   enforce it.
 - The lab reports the **occupied** bounding box, not the schematic's nominal size field.

@@ -301,6 +301,10 @@ test('ui: center-block option adds one sea lantern at the model middle', async (
   const lantern = audit.palette.find((e) => e.name === 'minecraft:sea_lantern');
   /* the crystal's inclusions are sea lanterns too — the marker adds exactly one */
   assert.strictEqual(lantern.count, r.inclusionTotal + 1, 'one extra sea lantern at the center');
+  /* the marker sits at the shard's INTERNAL center (r.center), not the bbox middle */
+  const cen = r.center;
+  const atCenter = audit.blocks.filter((b) => b.x === cen.x - r.minX && b.y === cen.y - r.minY && b.z === cen.z - r.minZ);
+  assert.ok(atCenter.length >= 1, 'sea lantern at the internal center ' + JSON.stringify(cen));
   cb.checked = false;
   const nbt2 = ctx.buildSchematic(r, p);
   const audit2 = await ctx.Gen.analyzeSchematic(nbt2);
@@ -412,9 +416,14 @@ test('ui: .litematic export round-trips through the lab reader', async () => {
 test('ui: lab reports center of mass; the crystal tab balances a dropped ship', async () => {
   const ctx = boot();
   await tick();
-  /* export a crystal schematic, then feed it back as the "ship" */
+  /* export a crystal schematic, then feed it back as the "ship".
+     Use a symmetric shard (no cracks / inclusions / nose dip) so the
+     PERFECTLY STRAIGHT verdict is deterministic, not seed luck. */
   ctx.switchTab('crystal');
   await tick();
+  Object.assign(ctx.state.params, { crackCount: 0, inclusionPct: 0, leanX: 0, leanZ: 0, midY: 0.5, inclusions: [{ material: 'sea_lantern', pct: 0 }] });
+  ctx.requestGen(true);
+  await tick(); await tick();
   const nbt = ctx.buildSchematic(ctx.state.result, ctx.state.params);
   ctx.switchTab('lab');
   await tick();

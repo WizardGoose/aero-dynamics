@@ -575,8 +575,9 @@ test('shapes: torus ring fits its box; big grids are capped', () => {
 });
 
 test('shapes: oversized dimensions are downscaled before allocation', () => {
-  const r = Gen.genShapes({ kind: 'sphere', sizeX: 200, sizeY: 200, sizeZ: 200 });
-  assert.ok(r.solid < 200 * 200 * 200);
+  const r = Gen.genShapes({ kind: 'torus', sizeX: 200, sizeY: 200, sizeZ: 200 });
+  assert.ok(r.maxX - r.minX + 1 < 402);
+  assert.ok(r.maxZ - r.minZ + 1 < 402);
   assert.ok(r.count + r.interior <= 24000000 + 1);
 });
 

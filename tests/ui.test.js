@@ -447,6 +447,39 @@ test('ui: lab reports center of mass; the crystal tab balances a dropped ship', 
   assert.ok(ctx.state.crystalCheck, 'crystal drop zone runs the same check');
 });
 
+test('ui: inclusion variants — add rows, set glass materials, share-link round-trip', async () => {
+  const ctx = boot();
+  await tick();
+  ctx.switchTab('crystal');
+  await tick();
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(ctx.state.params.inclusions)), [{ material: 'sea_lantern', pct: 3 }]);
+  /* add a second variant and set it to glass */
+  ctx.document.getElementById('inc-add').click();
+  assert.strictEqual(ctx.state.params.inclusions.length, 2);
+  const sel = ctx.document.getElementById('inc-mat-1');
+  sel.value = 'tinted_glass';
+  sel.fire('change');
+  assert.strictEqual(ctx.state.params.inclusions[1].material, 'tinted_glass');
+  const pct = ctx.document.getElementById('inc-pct-1');
+  pct.value = '7';
+  pct.fire('input');
+  assert.strictEqual(ctx.state.params.inclusions[1].pct, 7);
+  await tick(); await tick();
+  /* the generated model reports the variant patches */
+  assert.ok(ctx.state.result && Array.isArray(ctx.state.result.inclusions));
+  assert.strictEqual(ctx.state.result.inclusions.length, 2);
+  assert.strictEqual(ctx.state.result.inclusions[1].material, 'tinted_glass');
+  /* remove the extra variant again */
+  ctx.document.getElementById('inc-x-1').click();
+  assert.strictEqual(ctx.state.params.inclusions.length, 1);
+  /* share links carry the whole variant list */
+  ctx.state.params.inclusions = [{ material: 'glass', pct: 5 }, { material: 'tinted_glass', pct: 8 }];
+  const enc = ctx.encodeParams('crystal', ctx.state.params);
+  const dec = ctx.decodeParams('crystal', enc);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(dec.inclusions)), [{ material: 'glass', pct: 5 }, { material: 'tinted_glass', pct: 8 }]);
+  assert.strictEqual(dec.inclusionMaterial, 'glass');
+});
+
 test('ui: ponder guide opens and steps through balloon and crystal builds', async () => {
   const ctx = boot();
   await tick();

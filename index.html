@@ -386,6 +386,7 @@ var WING = 12;                       /* copycat wing blocks (Create Propulsion: 
 /* crystal shard ships */
 var CRYSTAL = 20, INCLUSION = 21, AIRBURNER = 22, PROPBEARING = 23,
     PROPELLER = 24, STEERWHEEL = 25, THROTTLE = 26, ASSEMBLER = 27;
+var INCLUSION_V = 28;   /* inclusion variant #1+ live in 28..99 (variant 0 stays INCLUSION) */
 var COLORS = ['white','orange','magenta','light_blue','yellow','lime','pink','gray','light_gray','cyan','purple','blue','brown','green','red','black'];
 var WOODS = ['oak','spruce','birch','dark_oak','jungle','acacia','cherry','crimson','warped'];
 var WOOL_RGB = { white:15263976, orange:15758867, magenta:12403891, light_blue:3847130, yellow:16701501, lime:8439583, pink:15961258, gray:4673362, light_gray:10263959, cyan:1481885, purple:8991415, blue:3949738, brown:8606770, green:6126613, red:11546150, black:1907745 };
@@ -545,7 +546,9 @@ var DEFAULT_CRYSTAL = {
   twistDeg: 0, leanX: 1, leanZ: 0, asym: 0, jitter: 0.1,
   crackCount: 2, inclusionPct: 3, seed: 1337,
   hollow: true, shell: 1, blockMass: 1, payload: 0,
-  material: 'glass', inclusionMaterial: 'sea_lantern', orientation: 'horizontal', centerMode: 'odd',
+  material: 'glass', inclusionMaterial: 'sea_lantern',
+  inclusions: [{ material: 'sea_lantern', pct: 3 }],   /* patchwork variants: any mix of glass + glow blocks */
+  orientation: 'horizontal', centerMode: 'odd',
   shipX: 0, shipZ: 0
 };
 
@@ -553,8 +556,9 @@ var CRYSTAL_PRESETS = [
   { name: 'Horizontal Shard ★ flies', p: { } },
   { name: 'Bullet', p: { heightY: 56, baseDiagX: 14, baseDiagZ: 14, facets: 6, midY: 0.35, midBand: 0.05, taperPower: 1.6, leanX: 2.5, jitter: 0.05, material: 'tinted_glass', seed: 7 } },
   { name: 'Twin-Spike', p: { heightY: 48, baseDiagX: 12, baseDiagZ: 12, facets: 4, midBand: 0, taperPower: 0.7, leanZ: 2, twistDeg: 60, material: 'levitite', seed: 21 } },
-  { name: 'Amethyst Giant', p: { heightY: 60, baseDiagX: 22, baseDiagZ: 22, facets: 6, midBand: 0.2, taperPower: 0.9, jitter: 0.12, twistDeg: 30, material: 'amethyst_block', inclusionMaterial: 'sea_lantern', seed: 3 } },
-  { name: 'Shattered Hex', p: { heightY: 40, baseDiagX: 24, baseDiagZ: 16, facets: 6, midBand: 0.1, topCrop: 0.25, crackCount: 8, inclusionPct: 5, leanX: 2, asym: 0.15, seed: 77 } },
+  { name: 'Amethyst Giant', p: { heightY: 60, baseDiagX: 22, baseDiagZ: 22, facets: 6, midBand: 0.2, taperPower: 0.9, jitter: 0.12, twistDeg: 30, material: 'amethyst_block', inclusions: [{ material: 'sea_lantern', pct: 3 }], seed: 3 } },
+  { name: 'Shattered Hex', p: { heightY: 40, baseDiagX: 24, baseDiagZ: 16, facets: 6, midBand: 0.1, topCrop: 0.25, crackCount: 8, inclusions: [{ material: 'sea_lantern', pct: 5 }], leanX: 2, asym: 0.15, seed: 77 } },
+  { name: 'Patchwork Glass', p: { heightY: 48, baseDiagX: 18, baseDiagZ: 12, facets: 6, midBand: 0.08, crackCount: 0, inclusions: [{ material: 'tinted_glass', pct: 8 }, { material: 'white_stained_glass', pct: 6 }, { material: 'cyan_stained_glass', pct: 4 }], seed: 9 } },
   { name: 'Upright Shard', p: { orientation: 'vertical', heightY: 44, baseDiagX: 14, baseDiagZ: 10, leanX: 0, leanZ: 0, centerMode: 'even', seed: 11 } },
 ];
 
@@ -673,11 +677,10 @@ var CTLS = {
     { t: 'range', k: 'jitter',         label: 'Vertex jitter',       min: 0,  max: 0.4, step: 0.01 },
     { t: 'range', k: 'asym',           label: 'Asymmetry (X vs Z taper)', min: 0, max: 0.5, step: 0.01 },
     { t: 'range', k: 'crackCount',     label: 'Cracks',              min: 0,  max: 20, step: 1, num: true },
-    { t: 'range', k: 'inclusionPct',   label: 'Inclusions (% of hull, glow clusters)', min: 0, max: 100, step: 1, num: true, suffix: '%' },
     { t: 'seed',  k: 'seed',           label: 'Seed (re-rolls every imperfection)' },
     { t: 'group', label: 'Materials' },
     { t: 'sel',   k: 'material',       label: 'Crystal material',    opts: ['glass', 'tinted_glass', 'white_stained_glass', 'orange_stained_glass', 'magenta_stained_glass', 'light_blue_stained_glass', 'yellow_stained_glass', 'lime_stained_glass', 'pink_stained_glass', 'gray_stained_glass', 'light_gray_stained_glass', 'cyan_stained_glass', 'purple_stained_glass', 'blue_stained_glass', 'brown_stained_glass', 'green_stained_glass', 'red_stained_glass', 'black_stained_glass', 'amethyst_block', 'levitite', 'pearlescent_levitite'] },
-    { t: 'sel',   k: 'inclusionMaterial', label: 'Inclusion material', opts: ['sea_lantern', 'amethyst_block', 'glowstone', 'shroomlight', 'verdant_froglight', 'ochre_froglight', 'pearlescent_froglight'] },
+    { t: 'inclusions', k: 'inclusions', label: 'Inclusion patches (% of hull each)' },
     { t: 'group', label: 'Lift math (the interior you fit)' },
     { t: 'range', k: 'blockMass',      label: 'Avg block mass',      min: 0.1, max: 10, step: 0.1 },
     { t: 'range', k: 'payload',        label: 'Payload mass',        min: 0, max: 1000, step: 10, num: true },
@@ -702,6 +705,84 @@ var CTLS = {
   ],
   lab: [],
 };
+
+/* ================= inclusion variant editor =================
+   A crystal's inclusions are patchwork variants — each is a material with
+   its own share of the hull, generated as seeded patches. Any mix works:
+   3 glass types read as crystal texturing, glow blocks light the interior. */
+var INC_MATS = [];
+(function () {
+  var seen = {};
+  for (var imk = 0; imk < Object.keys(CRYSTAL_RGB).length; imk++) {
+    var im1 = Object.keys(CRYSTAL_RGB)[imk];
+    if (!seen[im1]) { seen[im1] = 1; INC_MATS.push(im1); }
+  }
+  for (var imk2 = 0; imk2 < Object.keys(INCLUSION_RGB).length; imk2++) {
+    var im2 = Object.keys(INCLUSION_RGB)[imk2];
+    if (!seen[im2]) { seen[im2] = 1; INC_MATS.push(im2); }
+  }
+})();
+function isIncType(t) { return t === INCLUSION || (t >= INCLUSION_V && t < 100); }
+function incIndexOf(t) { return t === INCLUSION ? 0 : t - INCLUSION_V + 1; }
+function incMaterialAt(p, i) {
+  if (p && Array.isArray(p.inclusions) && p.inclusions.length) return (p.inclusions[i] && p.inclusions[i].material) || 'sea_lantern';
+  return p.inclusionMaterial || 'sea_lantern';
+}
+function incIsGlass(m) { return CRYSTAL_RGB[m] !== undefined; }
+/* keep the legacy single-variant params in sync with the variant list, and
+   back-fill the list when only the legacy fields were set (old share links,
+   old presets) */
+function reconcileInclusions(p) {
+  p = p || state.params;
+  if (!Array.isArray(p.inclusions) || !p.inclusions.length) {
+    p.inclusions = [{ material: p.inclusionMaterial || 'sea_lantern', pct: +(p.inclusionPct || 0) }];
+  }
+  p.inclusionMaterial = p.inclusions[0].material;
+  p.inclusionPct = p.inclusions[0].pct;
+}
+function renderInclusionRows() {
+  var host = document.getElementById('inc-host');
+  if (!host) return;
+  reconcileInclusions(state.params);
+  var list = state.params.inclusions;
+  var html = '';
+  for (var i = 0; i < list.length; i++) {
+    html += '<div class="selrow" style="margin-bottom:4px">' +
+      '<select id="' + (i === 0 ? 'p-inclusionMaterial' : 'inc-mat-' + i) + '" title="Patch material">' +
+      INC_MATS.map(function (m) { return '<option' + (m === list[i].material ? ' selected' : '') + '>' + m + '</option>'; }).join('') +
+      '</select>' +
+      '<input type="number" id="inc-pct-' + i + '" min="0" max="100" step="1" value="' + list[i].pct + '" title="% of the hull">%' +
+      (i > 0 ? '<button class="hbtn" id="inc-x-' + i + '" title="Remove this variant" style="padding:2px 8px">✕</button>' : '') +
+      '</div>';
+  }
+  host.innerHTML = html;
+  for (var j = 0; j < list.length; j++) {
+    (function (j) {
+      var sel = document.getElementById(j === 0 ? 'p-inclusionMaterial' : 'inc-mat-' + j);
+      sel.addEventListener('change', function () {
+        list[j].material = sel.value;
+        if (j === 0) state.params.inclusionMaterial = sel.value;
+        requestGen(false);
+      });
+      var num = document.getElementById('inc-pct-' + j);
+      num.addEventListener('input', function () {
+        var v = parseInt(num.value, 10);
+        if (isNaN(v)) return;
+        v = Math.min(100, Math.max(0, v));
+        list[j].pct = v;
+        if (j === 0) state.params.inclusionPct = v;
+        requestGen(false);
+      });
+      var x = document.getElementById('inc-x-' + j);
+      if (x) x.onclick = function () {
+        list.splice(j, 1);
+        if (!list.length) list.push({ material: state.params.inclusionMaterial || 'sea_lantern', pct: state.params.inclusionPct || 0 });
+        renderInclusionRows();
+        requestGen(false);
+      };
+    })(j);
+  }
+}
 
 /* ================= panel builder ================= */
 var CTLREG = { seg: {}, swatch: {} };   /* control elements, for active-state sync + tests */
@@ -740,6 +821,9 @@ function buildPanel() {
         '<button class="dice" id="d-' + c.k + '" title="Re-roll the seed">🎲</button></div></div>';
     } else if (c.t === 'btn') {
       html += '<div class="btnrow' + (c.group ? ' g-' + c.group : '') + '"><button class="hbtn" id="p-' + c.k + '">' + c.label + '</button></div>';
+    } else if (c.t === 'inclusions') {
+      html += '<div id="inc-host"></div>' +
+        '<div class="btnrow"><button class="hbtn" id="inc-add">+ Add variant</button></div>';
     } else {
       html += '<div class="selrow' + (c.group ? ' g-' + c.group : '') + '"><span>' + c.label + '</span>' +
         '<select id="p-' + c.k + '">' + c.opts.map(function (o) { return '<option>' + o + '</option>'; }).join('') +
@@ -878,6 +962,14 @@ function buildPanel() {
     }
   }
   if (state.tab === 'crystal') {
+    var incAdd = document.getElementById('inc-add');
+    if (incAdd) incAdd.onclick = function () {
+      reconcileInclusions(state.params);
+      state.params.inclusions.push({ material: 'sea_lantern', pct: 3 });
+      renderInclusionRows();
+      requestGen(false);
+    };
+    renderInclusionRows();
     var cdrop = document.getElementById('crystal-drop');
     var cfile = document.getElementById('crystal-file');
     cdrop.onclick = function () { cfile.click(); };
@@ -943,6 +1035,7 @@ function autoTrimShip() {
   toast('Ship re-positioned to zero the combined craft COM');
 }
 function syncControls() {
+  if (state.tab === 'crystal') renderInclusionRows();
   var ctl = CTLS[state.tab];
   for (var i = 0; i < ctl.length; i++) {
     var c = ctl[i];
@@ -1224,7 +1317,11 @@ function updateReq(r) {
     html += '<span class="req-formula">copycat wings are 16×8/12/14×16 px flat panels — place on your ship, force acts at each block</span>';
   } else if (tab === 'crystal') {
     var cm = Gen.mathFor(r, p.blockMass, p.payload);
-    html += '<span>Shard hull: <b>' + r.crystalCount.toLocaleString() + ' ' + p.material.replace(/_/g, ' ') + '</b>' + (r.inclusionTotal ? ' + ' + r.inclusionTotal + ' ' + p.inclusionMaterial.replace(/_/g, ' ') : '') + (r.cracksMade ? ' · ' + r.cracksMade + ' crack' + (r.cracksMade > 1 ? 's' : '') : '') + '</span>';
+    var incBits = [];
+    if (r.inclusions) for (var ix2 = 0; ix2 < r.inclusions.length; ix2++) {
+      if (r.inclusions[ix2].count) incBits.push(r.inclusions[ix2].count + ' ' + r.inclusions[ix2].material.replace(/_/g, ' '));
+    }
+    html += '<span>Shard hull: <b>' + r.crystalCount.toLocaleString() + ' ' + p.material.replace(/_/g, ' ') + '</b>' + (incBits.length ? ' + ' + incBits.join(' · ') : '') + (r.cracksMade ? ' · ' + r.cracksMade + ' crack' + (r.cracksMade > 1 ? 's' : '') : '') + '</span>';
     html += '<span>Center: <b>' + (r.centerMode === 'even' ? 'even — the middle lands on a 2×2 junction' : 'odd — single block at the middle') + '</b> · nose dip ' + r.leanX + ' block' + (r.leanX === 1 ? '' : 's') + '</span>';
     html += '<span>Cavity (your interior): <b>' + r.interior.toLocaleString() + ' blocks</b> → lift ' + cm.lift.toLocaleString() + '</span>';
     html += '<span>Burners: <b>' + cm.burners + '</b>' + (cm.waste ? ' (' + cm.waste.toLocaleString() + ' waste)' : ' (exact ✔)') + '</span>';
@@ -1619,7 +1716,7 @@ function renderPreview(r) {
     if (type === PLANK) return 'p:' + (p.frameMaterial === 'andesite_casing' ? 'spruce' : p.frameWoodType);
     if (type === WING) return 'g:wing';
     if (type === CRYSTAL) return 'x:' + (p.material || 'glass');
-    if (type === INCLUSION) return 'i:' + (p.inclusionMaterial || 'sea_lantern');
+    if (isIncType(type)) return 'i:' + incMaterialAt(p, incIndexOf(type));
     if (type === AIRBURNER) return 'n:burner';
     if (type === PROPBEARING) return 'n:bearing';
     if (type === PROPELLER) return 'n:prop';
@@ -1650,7 +1747,11 @@ function renderPreview(r) {
     else if (type2 === PLANK) { color = PLANK_RGB[p.frameMaterial === 'andesite_casing' ? 'spruce' : (p.frameWoodType || 'spruce')] || PLANK_RGB.spruce; rough = 0.75; metal = 0.08; }
     else if (type2 === WING) { color = 0xe8e8e8; rough = 0.6; metal = 0.4; }
     else if (type2 === CRYSTAL) { color = CRYSTAL_RGB[p.material] || CRYSTAL_RGB.glass; rough = 0.08; metal = 0; }
-    else if (type2 === INCLUSION) { color = INCLUSION_RGB[p.inclusionMaterial] || INCLUSION_RGB.sea_lantern; rough = 0.35; metal = 0; }
+    else if (isIncType(type2)) {
+      var imat2 = incMaterialAt(p, incIndexOf(type2));
+      if (incIsGlass(imat2)) { color = CRYSTAL_RGB[imat2]; rough = 0.08; metal = 0; }
+      else { color = INCLUSION_RGB[imat2] || INCLUSION_RGB.sea_lantern; rough = 0.35; metal = 0; }
+    }
     else if (type2 === AIRBURNER) { color = 0x8a6a3a; rough = 0.5; metal = 0.6; }
     else if (type2 === PROPBEARING) { color = 0x6a7278; rough = 0.4; metal = 0.7; }
     else if (type2 === PROPELLER) { color = 0xa89060; rough = 0.55; metal = 0.4; }
@@ -1662,8 +1763,8 @@ function renderPreview(r) {
     var mesh = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color: color, roughness: rough, metalness: metal }), n2);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    if (type2 === CRYSTAL) { mesh.material.transparent = true; mesh.material.opacity = 0.72; }
-    if (type2 === INCLUSION) { mesh.material.emissive = new THREE.Color(color); mesh.material.emissiveIntensity = 0.85; }
+    if (type2 === CRYSTAL || (isIncType(type2) && incIsGlass(incMaterialAt(p, incIndexOf(type2))))) { mesh.material.transparent = true; mesh.material.opacity = 0.72; }
+    if (isIncType(type2) && !incIsGlass(incMaterialAt(p, incIndexOf(type2)))) { mesh.material.emissive = new THREE.Color(color); mesh.material.emissiveIntensity = 0.85; }
     /* real texture per block type: face-aware (atlas crops, distinct tops) with flat-color fallback */
     var faceDef = TEX_FACES[type2];
     if (faceDef) {
@@ -1691,7 +1792,7 @@ function renderPreview(r) {
     dummy.updateMatrix();
     mesh3.setMatrixAt(ci, dummy.matrix);
     var t3 = r.types[j];
-    var vary = (t3 === CRYSTAL || t3 === INCLUSION) ? crystalVar(bx, by, bz) : blockVar(bx, by, bz);
+    var vary = (t3 === CRYSTAL || isIncType(t3)) ? crystalVar(bx, by, bz) : blockVar(bx, by, bz);
     tint.setRGB(vary, vary, vary);
     mesh3.setColorAt(ci, tint);
     filled[k3] = ci + 1;
@@ -1772,9 +1873,9 @@ function blockName(type, p) {
     if (cm === 'pearlescent_levitite') return 'aeronautics:pearlescent_levitite';
     return 'minecraft:' + cm;   /* glass, tinted_glass, amethyst_block, *_stained_glass */
   }
-  if (type === INCLUSION) {
-    var im = p.inclusionMaterial || 'sea_lantern';
-    return 'minecraft:' + im;   /* sea_lantern, amethyst_block, glowstone, shroomlight, *_froglight */
+  if (isIncType(type)) {
+    var im = incMaterialAt(p, incIndexOf(type));
+    return 'minecraft:' + im;   /* patch variants: glass / stained glass + sea_lantern, glowstone, *_froglight */
   }
   if (type === AIRBURNER) return 'aeronautics:adjustable_burner';
   if (type === PROPBEARING) return 'aeronautics:propeller_bearing';
@@ -2023,14 +2124,14 @@ var FIELD_TYPES = {
   balloon: { lengthX: 'i', widthZ: 'i', heightY: 'i', cylinderMid: 'f', frontTaper: 'f', rearTaper: 'f', topFlatten: 'f', bottomFlatten: 'f', hollow: 'b', prune: 'b', perfect: 'b', profileScale: 'f', shell: 'i', ribEnabled: 'b', ribSpacing: 'i', keelEnabled: 'b', keelDepth: 'i', finEnabled: 'b', sideFinEnabled: 'b', finHeight: 'i', finLength: 'i', envelopeMaterial: 'e', envelopeColor: 'e', frameMaterial: 'e', frameWoodType: 'e', ribOffset: 'i', blockMass: 'f', payload: 'i' },
   prop: { blades: 'i', length: 'i', rootChord: 'i', tipChord: 'i', sweepDegrees: 'f', swept: 'b', airfoilShape: 'e', bladeMaterial: 'e', bladeColor: 'e', rotation: 'f', orientation: 'e', forceCenter: 'b' },
   wings: { halfSpan: 'i', rootChord: 'i', tipChord: 'i', sweepBlocks: 'i', planform: 'e', wingBlock: 'e', mirror: 'b' },
-  crystal: { heightY: 'i', baseDiagX: 'i', baseDiagZ: 'i', facets: 'i', taperPower: 'g', midY: 'f', midBand: 'f', topCrop: 'f', twistDeg: 'f', leanX: 'f', leanZ: 'f', asym: 'f', jitter: 'f', crackCount: 'i', inclusionPct: 'i', seed: 'i', hollow: 'b', shell: 'i', blockMass: 'f', payload: 'i', material: 'e', inclusionMaterial: 'e', orientation: 'e', centerMode: 'e', shipX: 'f', shipZ: 'f' },
+  crystal: { heightY: 'i', baseDiagX: 'i', baseDiagZ: 'i', facets: 'i', taperPower: 'g', midY: 'f', midBand: 'f', topCrop: 'f', twistDeg: 'f', leanX: 'f', leanZ: 'f', asym: 'f', jitter: 'f', crackCount: 'i', inclusionPct: 'i', seed: 'i', hollow: 'b', shell: 'i', blockMass: 'f', payload: 'i', material: 'e', inclusionMaterial: 'e', orientation: 'e', centerMode: 'e', shipX: 'f', shipZ: 'f', inclusions: 'j' },
   shapes: { kind: 'e', sizeX: 'i', sizeY: 'i', sizeZ: 'i', axis: 'e', hollow: 'b', shell: 'i', material: 'e', envelopeColor: 'e', frameWoodType: 'e' }
 };
 var FIELD_ORDER = {
   balloon: ['lengthX','widthZ','heightY','cylinderMid','frontTaper','rearTaper','topFlatten','bottomFlatten','hollow','prune','perfect','profileScale','shell','ribEnabled','ribSpacing','keelEnabled','keelDepth','finEnabled','sideFinEnabled','finHeight','finLength','envelopeMaterial','envelopeColor','frameMaterial','frameWoodType','ribOffset','blockMass','payload'],
   prop: ['blades','length','rootChord','tipChord','sweepDegrees','swept','airfoilShape','bladeMaterial','bladeColor','rotation','orientation','forceCenter'],
   wings: ['halfSpan','rootChord','tipChord','sweepBlocks','planform','wingBlock','mirror'],
-  crystal: ['heightY','baseDiagX','baseDiagZ','facets','taperPower','midY','midBand','topCrop','twistDeg','leanX','leanZ','asym','jitter','crackCount','inclusionPct','seed','hollow','shell','blockMass','payload','material','inclusionMaterial','orientation','centerMode','shipX','shipZ'],
+  crystal: ['heightY','baseDiagX','baseDiagZ','facets','taperPower','midY','midBand','topCrop','twistDeg','leanX','leanZ','asym','jitter','crackCount','inclusionPct','seed','hollow','shell','blockMass','payload','material','inclusionMaterial','orientation','centerMode','shipX','shipZ','inclusions'],
   shapes: ['kind','sizeX','sizeY','sizeZ','axis','hollow','shell','material','envelopeColor','frameWoodType']
 };
 var KIND_PREFIX = { balloon: 'b3', prop: 'p3', wings: 'w4', crystal: 'c5', shapes: 'h5' };
@@ -2047,6 +2148,9 @@ function encodeParams(tab, params) {
     else if (t === 'f') parts.push(String(Math.round(v * 100)));
     else if (t === 'g') parts.push(String(Math.round(v * 1000)));   /* 3-decimal precision (profileScale needs it) */
     else if (t === 'i') parts.push(String(v));
+    else if (t === 'j') parts.push(v && JSON.stringify(v) !== JSON.stringify(def[k])
+      ? v.map(function (e) { return (e.material || 'sea_lantern') + ':' + Math.round(e.pct || 0); }).join(',')
+      : '');
     else parts.push((ENUM[k] && ENUM[k][v]) || v);
   }
   while (parts.length > 1 && parts[parts.length - 1] === '') parts.pop();
@@ -2067,11 +2171,23 @@ function decodeParams(tab, s) {
     else if (t === 'f') out[k] = parseFloat(raw) / 100;
     else if (t === 'g') out[k] = parseFloat(raw) / 1000;
     else if (t === 'i') out[k] = parseInt(raw, 10);
+    else if (t === 'j') {
+      out[k] = raw ? raw.split(',').map(function (e) {
+        var mm = e.split(':');
+        return { material: mm[0] || 'sea_lantern', pct: parseInt(mm[1] || '0', 10) || 0 };
+      }) : null;
+    }
     else {
       var map = ENUM_DECODE[k];
       if (map && map[raw] !== undefined) out[k] = map[raw];
       else if (!map) out[k] = raw;
     }
+  }
+  if (tab === 'crystal') {
+    var jIdx = order.indexOf('inclusions');
+    var rawJ = jIdx >= 0 ? parts[jIdx] : undefined;
+    if (rawJ === undefined || rawJ === '') out.inclusions = null;   /* link predates the variant list */
+    reconcileInclusions(out);
   }
   return out;
 }
@@ -2293,7 +2409,7 @@ function typeKey(tp, p) {
     : tp === PLANK ? 'p:' + (p.frameMaterial === 'andesite_casing' ? 'spruce' : p.frameWoodType)
     : tp === WING ? 'g:wing'
     : tp === CRYSTAL ? 'x:' + (p.material || 'glass')
-    : tp === INCLUSION ? 'i:' + (p.inclusionMaterial || 'sea_lantern')
+    : isIncType(tp) ? 'i:' + incMaterialAt(p, incIndexOf(tp))
     : tp === AIRBURNER ? 'n:burner'
     : tp === PROPBEARING ? 'n:bearing'
     : tp === PROPELLER ? 'n:prop'
@@ -2310,7 +2426,10 @@ function blockColorHex(type, p) {
   else if (type === PLANK) c = PLANK_RGB[p.frameMaterial === 'andesite_casing' ? 'spruce' : (p.frameWoodType || 'spruce')] || PLANK_RGB.spruce;
   else if (type === WING) c = 0xe8e8e8;
   else if (type === CRYSTAL) c = CRYSTAL_RGB[p.material] || CRYSTAL_RGB.glass;
-  else if (type === INCLUSION) c = INCLUSION_RGB[p.inclusionMaterial] || INCLUSION_RGB.sea_lantern;
+  else if (isIncType(type)) {
+    var imc = incMaterialAt(p, incIndexOf(type));
+    c = incIsGlass(imc) ? CRYSTAL_RGB[imc] : (INCLUSION_RGB[imc] || INCLUSION_RGB.sea_lantern);
+  }
   else if (type === AIRBURNER) c = 0x8a6a3a;
   else if (type === PROPBEARING) c = 0x6a7278;
   else if (type === PROPELLER) c = 0xa89060;

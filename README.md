@@ -16,7 +16,8 @@ tab and every model exportable as a real schematic.
 
 **Textures** — the 3D preview renders with real in-game textures, extracted from the vanilla
 1.21.1 client jar and the exact mod jars in the pack (`textures/`), pixel-filtered like
-Minecraft; glass and amethyst crystals render translucent, inclusions glow. If a texture can't
+Minecraft; glass and amethyst crystals render translucent, glass inclusion patches render
+like glass and glow-block inclusions glow. If a texture can't
 load (e.g. `file://`), the preview falls back to flat colors automatically.
 
 **Handbook** — `wiki.html` is the Create Aeronautics handbook, rebuilt as a **Ponder-style
@@ -43,12 +44,12 @@ Real crystals are never perfect, and this one isn't either — every inconsisten
 
 - **facets** (3–10; 4 = rhombus), **taper curve**, **truncated tip** (a broken shard)
 - **twist**, **vertex jitter**, **lean** (X/Z — the bullet angle), **asymmetric taper**
-- **cracks** — missing hull along short seeded lines, **inclusions** — glowing clusters,
+- **cracks** — sealed grooves carved along short seeded lines (the hull stays airtight; the cavity never vents), **inclusions** — patchwork variants (any mix of glass and glow blocks, as many as you like),
   sized as a **percentage of the hull** so big crystals glow proportionally more than small ones
 - **seed** — the same seed + sliders always reproduce the exact same shard, so share links
   and tests are deterministic
 
-Materials: every glass in the game — clear, tinted, and all 16 stained glass colors — plus amethyst, or aeronautics levitite / pearlescent levitite; inclusions glow in sea lantern, amethyst, glowstone, shroomlight or any froglight.
+Materials: every glass in the game — clear, tinted, and all 16 stained glass colors — plus amethyst, or aeronautics levitite / pearlescent levitite. Inclusion patches are variants you stack: each is a material with its own % of the hull, generated in seeded patches (e.g. three glass types for patchwork crystal texturing) — pick any glass, sea lantern, amethyst, glowstone, shroomlight or froglight.
 Every preset flies out of the box once you fit its interior.
 
 ## The math is in the tabs
@@ -201,7 +202,8 @@ npm test                        # node --test, no dependencies
   propeller variant.
 - Ribs/keel/fins don't change the interior (ribs recolor shell blocks; keel and fins attach
   outside), so you can add them after picking a size.
-- Crystal interior = solid − hull (crack voids join the cavity; a solid shard has no cavity).
+- Crystal interior = solid − hull (cracks are sealed grooves, so they never open the cavity;
+  stray rasterization air pockets are filled with crystal; a solid shard has no cavity).
   `interior + crystal + inclusions = solid` always holds for hollow shards — the tests
   enforce it.
 - The lab reports the **occupied** bounding box, not the schematic's nominal size field.

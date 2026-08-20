@@ -343,6 +343,101 @@ test('crystal: net lift = lift - mass, matches mathFor on interior', () => {
   assert.strictEqual(r.net, r.lift - r.mass);
 });
 
+test('crystal: airtight — exactly one sealed cavity, no stray air gaps', () => {
+  /* rebuild the emitted hull and flood-fill air from the outside bbox,
+     6-connected (the game's face-tight seal semantics) */
+  const analyze = (r) => {
+    const X = r.maxX - r.minX + 1, Y = r.maxY - r.minY + 1, Z = r.maxZ - r.minZ + 1;
+    const YZ = Y * Z;
+    const grid = new Uint8Array(X * Y * Z);
+    for (let i = 0; i < r.count; i++) {
+      const x = r.positions[i * 3] - r.minX, y = r.positions[i * 3 + 1] - r.minY, z = r.positions[i * 3 + 2] - r.minZ;
+      grid[x * YZ + y * Z + z] = 1;
+    }
+    const mark = new Int32Array(X * Y * Z);
+    const q = [];
+    const seed = (x, y, z) => { const i = x * YZ + y * Z + z; if (!grid[i] && !mark[i]) { mark[i] = 1; q.push(i); } };
+    for (let x = 0; x < X; x++) for (let y = 0; y < Y; y++) { seed(x, y, 0); seed(x, y, Z - 1); }
+    for (let y = 0; y < Y; y++) for (let z = 0; z < Z; z++) { seed(0, y, z); seed(X - 1, y, z); }
+    for (let x = 0; x < X; x++) for (let z = 0; z < Z; z++) { seed(x, 0, z); seed(x, Y - 1, z); }
+    while (q.length) {
+      const i = q.pop();
+      const x = (i / YZ) | 0, rem = i - x * YZ, y = (rem / Z) | 0, z = rem - y * Z;
+      const nb = [];
+      if (x > 0) nb.push(i - YZ); if (x < X - 1) nb.push(i + YZ);
+      if (y > 0) nb.push(i - Z); if (y < Y - 1) nb.push(i + Z);
+      if (z > 0) nb.push(i - 1); if (z < Z - 1) nb.push(i + 1);
+      for (const n of nb) if (!grid[n] && !mark[n]) { mark[n] = 1; q.push(n); }
+    }
+    const comps = [];
+    let nextId = 2;
+    for (let i = 0; i < X * Y * Z; i++) {
+      if (grid[i] || mark[i]) continue;
+      const id = nextId++, qq = [i];
+      mark[i] = id;
+      let cnt = 0;
+      while (qq.length) {
+        const c = qq.pop(); cnt++;
+        const x = (c / YZ) | 0, rm = c - x * YZ, y = (rm / Z) | 0, z = rm - y * Z;
+        const nb = [];
+        if (x > 0) nb.push(c - YZ); if (x < X - 1) nb.push(c + YZ);
+        if (y > 0) nb.push(c - Z); if (y < Y - 1) nb.push(c + Z);
+        if (z > 0) nb.push(c - 1); if (z < Z - 1) nb.push(c + 1);
+        for (const n of nb) if (!grid[n] && !mark[n]) { mark[n] = id; qq.push(n); }
+      }
+      comps.push(cnt);
+    }
+    return comps;
+  };
+  /* a sweep of imperfection-heavy configs: exactly ONE enclosed air region
+     (the cavity) — no leaks, no pockets, no stranded chambers. Cracks must
+     still be carved (they are grooves now, not vents). */
+  const cases = [
+    {},
+    { jitter: 0, crackCount: 0, inclusionCount: 0, leanX: 0, leanZ: 0 },
+    { jitter: 0.4, twistDeg: 90, leanZ: 2, asym: 0.2, topCrop: 0.2, seed: 7 },
+    { jitter: 0.2, twistDeg: 60, crackCount: 8, leanX: 3, leanZ: 1, asym: 0.15, seed: 77, heightY: 40, baseDiagX: 24, baseDiagZ: 16, facets: 6, topCrop: 0.25 },
+    { orientation: 'vertical', jitter: 0.3, twistDeg: 120, leanX: 4, crackCount: 10, seed: 999, heightY: 36, baseDiagX: 14, baseDiagZ: 10, centerMode: 'even' },
+    { shell: 2, jitter: 0.4, crackCount: 6, twistDeg: 30, leanX: 5, seed: 13 },
+    { shell: 3, jitter: 0.4, crackCount: 12, twistDeg: 90, leanX: 5, leanZ: 3, asym: 0.3, seed: 42 },
+  ];
+  for (const p of cases) {
+    const r = Gen.genCrystal(p);
+    const comps = analyze(r);
+    assert.strictEqual(comps.length, 1, `one sealed air region for ${JSON.stringify(p)}: ${JSON.stringify(comps)}`);
+    assert.ok(comps[0] > 10, `the sealed region is the cavity: ${JSON.stringify(comps)}`);
+  }
+  /* cracks still carve real grooves (they just cannot vent the cavity) */
+  assert.strictEqual(Gen.genCrystal({ crackCount: 8, seed: 77 }).cracksMade, 8);
+});
+
+test('crystal: inclusion variants — glass patches with their own shares and type codes', () => {
+  const r = Gen.genCrystal({ crackCount: 0, seed: 9, inclusions: [
+    { material: 'tinted_glass', pct: 8 },
+    { material: 'white_stained_glass', pct: 6 },
+    { material: 'cyan_stained_glass', pct: 4 },
+  ] });
+  assert.strictEqual(r.inclusions.length, 3);
+  assert.strictEqual(r.inclusions[0].material, 'tinted_glass');
+  const hull = r.crystalCount + r.inclusionTotal;
+  for (const v of r.inclusions) {
+    assert.ok(Math.abs(v.count / hull - v.pct / 100) < 0.05, `${v.material} lands near its ${v.pct}% share (${v.count}/${hull})`);
+  }
+  /* distinct type codes per variant: 20 crystal, 21/28/29 inclusions —
+     never colliding with the feature band 22..27 */
+  const types = new Set(Array.from(r.types));
+  assert.ok(types.has(20) && types.has(21) && types.has(28) && types.has(29), JSON.stringify([...types]));
+  assert.strictEqual(r.inclusionTotal, r.inclusions.reduce((a, v) => a + v.count, 0));
+  assert.strictEqual(r.interior + r.crystalCount + r.inclusionTotal, r.solid);
+  /* legacy single-variant path still works, including plain glass */
+  const g = Gen.genCrystal({ inclusionMaterial: 'glass', inclusionPct: 4, crackCount: 0, seed: 1 });
+  assert.strictEqual(g.inclusions.length, 1);
+  assert.strictEqual(g.inclusions[0].material, 'glass');
+  assert.ok(g.inclusionTotal > 0);
+  /* a zero-share variant places nothing */
+  assert.strictEqual(Gen.genCrystal({ inclusions: [{ material: 'glass', pct: 0 }], crackCount: 0 }).inclusionTotal, 0);
+});
+
 /* ---------- shapes ---------- */
 test('shapes: every primitive generates, with sane hollow interiors', () => {
   for (const kind of ['sphere', 'cylinder', 'cone', 'pyramid', 'torus', 'dome']) {

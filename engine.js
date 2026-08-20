@@ -505,11 +505,15 @@
      the requirements, you fit the interior. No deck, no drive.
      Crystals are deliberately IMPERFECT, like the real thing: seeded
      per-vertex jitter, twist, lean, asymmetric taper, top truncation,
-     cracks (missing hull) and inclusions (glowing clusters). Every
-     imperfection is a slider; the same seed + params always reproduce
+     cracks (sealed grooves — the shard is always airtight) and
+     inclusions (patchwork variants: any mix of glass and glow blocks).
+     Every imperfection is a slider; the same seed + params always reproduce
      the same crystal, so share links and tests are deterministic. */
   var CRYSTAL = 20, INCLUSION = 21, AIRBURNER = 22, PROPBEARING = 23,
       PROPELLER = 24, STEERWHEEL = 25, THROTTLE = 26, ASSEMBLER = 27;
+  /* inclusion variants beyond the first use the reserved 28..99 band:
+     variant 0 stays INCLUSION, variant i>=1 is INCLUSION_V + i - 1 */
+  var INCLUSION_V = 28;
 
   /* mulberry32 — tiny deterministic PRNG: one seed, one crystal */
   function mulberry32(a) {
@@ -554,6 +558,42 @@
     return { hull: hull, count: hullCount };
   }
 
+  /* 6-connected flood fill: labels every empty cell OUTSIDE air (1) or
+     SEALED interior air (2). Airtightness in the game is face-tight —
+     diagonal gaps are not paths — so this is the exact seal check. */
+  function airLabels(grid, X, Y, Z) {
+    var total = X * Y * Z, YZ = Y * Z;
+    var lab = new Uint8Array(total);
+    var stack = [];
+    var seed = function (i) { if (!grid[i] && !lab[i]) { lab[i] = 1; stack.push(i); } };
+    for (var x = 0; x < X; x++) for (var y = 0; y < Y; y++) { seed(x * YZ + y * Z); seed(x * YZ + y * Z + Z - 1); }
+    for (var y = 0; y < Y; y++) for (var z = 0; z < Z; z++) { seed(y * Z + z); seed((X - 1) * YZ + y * Z + z); }
+    for (var x = 0; x < X; x++) for (var z = 0; z < Z; z++) { seed(x * YZ + z); seed(x * YZ + (Y - 1) * Z + z); }
+    while (stack.length) {
+      var i = stack.pop();
+      var xi = (i / YZ) | 0, rem = i - xi * YZ, yi = (rem / Z) | 0, zi = rem - yi * Z;
+      var nbs = [];
+      if (xi > 0) nbs.push(i - YZ);
+      if (xi < X - 1) nbs.push(i + YZ);
+      if (yi > 0) nbs.push(i - Z);
+      if (yi < Y - 1) nbs.push(i + Z);
+      if (zi > 0) nbs.push(i - 1);
+      if (zi < Z - 1) nbs.push(i + 1);
+      for (var n2 = 0; n2 < nbs.length; n2++) {
+        var j = nbs[n2];
+        if (!grid[j] && !lab[j]) { lab[j] = 1; stack.push(j); }
+      }
+    }
+    for (var k2 = 0; k2 < total; k2++) if (!grid[k2] && !lab[k2]) lab[k2] = 2;
+    return lab;
+  }
+
+  /* inclusion type codes: variant 0 keeps the classic INCLUSION code,
+     further variants live in the reserved 28..99 band */
+  function isIncType(t) {
+    return t === INCLUSION || (t >= INCLUSION_V && t < 100);
+  }
+
   function genCrystal(p) {
     p = p || {};
     var H = clamp(Math.round(p.heightY || 44), 6, 200);
@@ -575,8 +615,8 @@
     var asym = clamp(+p.asym || 0, 0, 0.5);
     var jitter = clamp(+(p.jitter === undefined ? 0.1 : p.jitter), 0, 0.4);
     var crackCount = clamp(Math.round(p.crackCount === undefined ? 2 : p.crackCount), 0, 20);
-    /* inclusions are a percentage of the hull — big crystals glow
-       proportionally more, small ones less. Legacy raw cluster counts
+    /* inclusions are a percentage of the hull — big crystals carry
+       proportionally more patch material. Legacy raw cluster counts
        (inclusionCount) are still accepted. */
     var inclusionPct, legacyInc = -1;
     if (p.inclusionPct !== undefined) inclusionPct = clamp(+p.inclusionPct, 0, 100);
@@ -595,7 +635,10 @@
     var rand = mulberry32(seed + 1);
 
     var RX0 = BX / 2, RZ0 = BZ / 2;
-    var padX = Math.ceil(jitter * RX0) + 2, padZ = Math.ceil(jitter * RZ0) + 2;
+    /* the nose dip is baked INTO the slice centers instead of being applied
+       as a shear at emit time (a shear breaks face-connectivity and opens
+       the hull), so the X pad must cover the whole dip swing */
+    var padX = Math.ceil(jitter * RX0 + leanX) + 2, padZ = Math.ceil(jitter * RZ0) + 2;
     var X = Math.ceil(BX + leanX) + 2 * padX;
     var Z = Math.ceil(BZ + leanZ) + 2 * padZ;
     var Y = H;
@@ -624,7 +667,9 @@
       var f = shapeF(t);
       var RX = RX0 * Math.pow(f, 1 + asym);
       var RZ = RZ0 * Math.pow(f, 1 - asym);
-      var cxp = cx0, czp = cz0 + leanZ * t;
+      /* baked nose dip: lying drops the nose in the world-Y direction
+         (internal X), upright slants the top tip +X */
+      var cxp = cx0 + (lying ? -Math.round(leanX * t) : Math.round(leanX * t)), czp = cz0 + leanZ * t;
       var twist = twistDeg * t;
       var vx = new Float64Array(n), vz = new Float64Array(n);
       for (var i2 = 0; i2 < n; i2++) {
@@ -660,99 +705,201 @@
       }
     }
 
-    /* ---- hollow shell (the cavity is where the hot-air interior goes) ---- */
+    /* ---- cracks: a short random line of missing material, carved into the
+       solid from the surface. The hull is peeled AFTER the carving, so every
+       crack becomes a sealed groove — its walls are the new hull — and the
+       cavity can never vent. ---- */
+    var surfCells = [];
+    for (var s2 = 0; s2 < total; s2++) {
+      if (!grid[s2]) continue;
+      if (!grid[s2 - Y * Z] || !grid[s2 + Y * Z] || !grid[s2 - Z] || !grid[s2 + Z] || !grid[s2 - 1] || !grid[s2 + 1]) surfCells.push(s2);
+    }
+    var crackOrigins = [];
+    for (var ck = 0; ck < crackCount; ck++) {
+      if (!surfCells.length) break;
+      var o = surfCells[Math.floor(rand() * surfCells.length)];
+      var ox = (o / (Y * Z)) | 0, oy = ((o - ox * Y * Z) / Z) | 0, oz = o - ox * Y * Z - oy * Z;
+      var dx = rand() * 2 - 1, dy = rand() * 2 - 1, dz = rand() * 2 - 1;
+      var dl = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+      dx /= dl; dy /= dl; dz /= dl;
+      var clen = 3 + Math.floor(rand() * 10);
+      var r2 = Math.ceil(clen + 1.1);
+      var cx0b = Math.max(0, ox - r2), cx1b = Math.min(X - 1, ox + r2);
+      var cy0b = Math.max(0, oy - r2), cy1b = Math.min(Y - 1, oy + r2);
+      var cz0b = Math.max(0, oz - r2), cz1b = Math.min(Z - 1, oz + r2);
+      var removed = 0;
+      for (var cxx = cx0b; cxx <= cx1b; cxx++) {
+        for (var cyy = cy0b; cyy <= cy1b; cyy++) {
+          for (var czz = cz0b; czz <= cz1b; czz++) {
+            var c = cxx * Y * Z + cyy * Z + czz;
+            if (!grid[c]) continue;
+            var rx = cxx - ox, ry = cyy - oy, rz = czz - oz;
+            var proj = rx * dx + ry * dy + rz * dz;
+            if (proj < 0 || proj > clen) continue;
+            var px2 = rx - proj * dx, py2 = ry - proj * dy, pz2 = rz - proj * dz;
+            if (px2 * px2 + py2 * py2 + pz2 * pz2 <= 1.1) {
+              grid[c] = 0;
+              solid--;
+              removed++;
+            }
+          }
+        }
+      }
+      if (removed) crackOrigins.push(o);
+    }
+
+    /* ---- airtight seal: any sealed air pocket left inside the solid (a
+       rasterization bubble, or a crack that never reached the surface) is
+       filled with crystal. After this the ONLY air inside the shard is the
+       cavity itself — no stray gaps, nothing to leak. ---- */
+    var pocketsFilled = 0;
+    var bubbleFills = [];
+    var sealLab = airLabels(grid, X, Y, Z);
+    for (var q2 = 0; q2 < total; q2++) {
+      if (sealLab[q2] === 2) {
+        grid[q2] = 1;
+        solid++;
+        pocketsFilled++;
+        bubbleFills.push(q2);
+      }
+    }
+    var cracksMade = 0;
+    for (var co = 0; co < crackOrigins.length; co++) if (!grid[crackOrigins[co]]) cracksMade++;
+
+    /* ---- hull: peel the carved, sealed solid. The skin is the complete
+       boundary of the solid, so the shell is airtight by construction and
+       the cavity is one connected interior. ---- */
     var hullMask, hullCells = [];
     if (hollow) {
       hullMask = shellPeel(grid, X, Y, Z, shell).hull;
     } else {
       hullMask = grid;
     }
-    var hullCount = 0;
-    for (var h = 0; h < total; h++) if (hullMask[h]) { hullCount++; hullCells.push(h); }
-    var cellType = new Uint8Array(total);   /* 0 none, 1 crystal, 2 inclusion */
-    for (var h2 = 0; h2 < hullCells.length; h2++) cellType[hullCells[h2]] = 1;
-
-    /* ---- cracks: missing hull along a short random line ---- */
-    var cracksMade = 0;
-    for (var ck = 0; ck < crackCount; ck++) {
-      if (!hullCells.length) break;
-      var o = hullCells[Math.floor(rand() * hullCells.length)];
-      var ox = (o / (Y * Z)) | 0, orm = o - ox * Y * Z, oy = (orm / Z) | 0, oz = orm - oy * Z;
-      var dx = rand() * 2 - 1, dy = rand() * 2 - 1, dz = rand() * 2 - 1;
-      var dl = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-      dx /= dl; dy /= dl; dz /= dl;
-      var clen = 3 + Math.floor(rand() * 10);
-      var removed = 0;
-      for (var h3 = hullCells.length - 1; h3 >= 0; h3--) {
-        var c = hullCells[h3];
-        var ccx = (c / (Y * Z)) | 0, crm = c - ccx * Y * Z, ccy = (crm / Z) | 0, ccz = crm - ccy * Z;
-        var rx = ccx - ox, ry = ccy - oy, rz = ccz - oz;
-        var proj = rx * dx + ry * dy + rz * dz;
-        if (proj < 0 || proj > clen) continue;
-        var px2 = rx - proj * dx, py2 = ry - proj * dy, pz2 = rz - proj * dz;
-        if (px2 * px2 + py2 * py2 + pz2 * pz2 <= 1.1) {
-          cellType[c] = 0;
-          hullCells.splice(h3, 1);
-          removed++;
+    for (var h = 0; h < total; h++) if (hullMask[h]) hullCells.push(h);
+    /* repair cells added below are buried inside the hull — they are
+       emitted as crystal (so no air pocket survives in the built shard)
+       but excluded from inclusion patches (patches must stay visible) */
+    var sealedFill = new Uint8Array(total);
+    if (hollow) {
+      for (var bf = 0; bf < bubbleFills.length; bf++) {
+        hullCells.push(bubbleFills[bf]);
+        sealedFill[bubbleFills[bf]] = 1;
+      }
+      /* stranded core pieces: a deep crack can pinch the cavity in two.
+         Fill every core piece except the largest with crystal, so the
+         ship's cavity stays one connected air region and no air gap is
+         left unconnected. */
+      var coreId = new Int32Array(total);
+      var coreSizes = [];
+      for (var q3 = 0; q3 < total; q3++) {
+        if (!grid[q3] || hullMask[q3] || coreId[q3]) continue;
+        var cid = coreSizes.length + 1;
+        var cstack = [q3];
+        coreId[q3] = cid;
+        var csz = 0;
+        while (cstack.length) {
+          var cc2 = cstack.pop(); csz++;
+          var cx4 = (cc2 / (Y * Z)) | 0, crm4 = cc2 - cx4 * Y * Z, cy4 = (crm4 / Z) | 0, cz4 = crm4 - cy4 * Z;
+          var cnbs = [];
+          if (cx4 > 0) cnbs.push(cc2 - Y * Z);
+          if (cx4 < X - 1) cnbs.push(cc2 + Y * Z);
+          if (cy4 > 0) cnbs.push(cc2 - Z);
+          if (cy4 < Y - 1) cnbs.push(cc2 + Z);
+          if (cz4 > 0) cnbs.push(cc2 - 1);
+          if (cz4 < Z - 1) cnbs.push(cc2 + 1);
+          for (var cn = 0; cn < cnbs.length; cn++) {
+            var cnb = cnbs[cn];
+            if (grid[cnb] && !hullMask[cnb] && !coreId[cnb]) { coreId[cnb] = cid; cstack.push(cnb); }
+          }
+        }
+        coreSizes.push(csz);
+      }
+      var mainCore = 0, mainCoreSize = 0;
+      for (var mc = 0; mc < coreSizes.length; mc++) {
+        if (coreSizes[mc] > mainCoreSize) { mainCoreSize = coreSizes[mc]; mainCore = mc + 1; }
+      }
+      for (var q4 = 0; q4 < total; q4++) {
+        if (coreId[q4] && coreId[q4] !== mainCore) {
+          hullCells.push(q4);
+          sealedFill[q4] = 1;
+          pocketsFilled++;
         }
       }
-      if (removed) cracksMade++;
     }
-    hullCount = hullCells.length;
+    var hullCount = hullCells.length;
+    var cellType = new Uint8Array(total);   /* 0 none, 1 crystal, 2+ inclusion variant */
+    for (var h2 = 0; h2 < hullCells.length; h2++) cellType[hullCells[h2]] = 1;
     var interior = hollow ? solid - hullCount : 0;
 
-    /* ---- inclusions: glowing clusters replacing hull cells. The amount is
-       a percentage of the hull (inclusionTarget blocks); legacy raw cluster
-       counts run the same loop with a cluster-count limit. ---- */
-    var inclusionTarget = legacyInc >= 0 ? -1 : Math.round(inclusionPct / 100 * hullCount);
-    var incLimit = legacyInc >= 0 ? legacyInc : 5000;
-    var inclusionPlaced = 0, stalls = 0;
-    for (var inc = 0; inc < incLimit; inc++) {
-      if (legacyInc < 0 && inclusionPlaced >= inclusionTarget) break;
-      if (legacyInc < 0 && stalls >= 200) break;
-      if (!hullCells.length) break;
-      var before = inclusionPlaced;
-      var start = hullCells[Math.floor(rand() * hullCells.length)];
-      if (cellType[start] !== 1) { stalls++; continue; }
-      var size = 2 + Math.floor(rand() * 6);
-      var queue = [start], seen = {};
-      var placed = 0;
-      while (queue.length && placed < size) {
-        var q = queue.pop();
-        if (seen[q] || cellType[q] !== 1) continue;
-        seen[q] = 1;
-        cellType[q] = 2;
-        placed++;
-        var qx = (q / (Y * Z)) | 0, qrm = q - qx * Y * Z, qy = (qrm / Z) | 0, qz = qrm - qy * Z;
-        var opts = [];
-        if (qx > 0) opts.push(q - Y * Z);
-        if (qx < X - 1) opts.push(q + Y * Z);
-        if (qy > 0) opts.push(q - Z);
-        if (qy < Y - 1) opts.push(q + Z);
-        if (qz > 0) opts.push(q - 1);
-        if (qz < Z - 1) opts.push(q + 1);
-        while (opts.length) queue.push(opts.splice(Math.floor(rand() * opts.length), 1)[0]);
+    /* ---- inclusions: glass OR glow patches replacing hull cells, for
+       crystal texturing. Each variant is a material with its own share of
+       the hull, grown as seeded blobs — patches, not a sprinkle — so e.g.
+       three glass variants read as natural patchwork texture. Legacy
+       single-variant params (inclusionMaterial + inclusionPct, or a raw
+       inclusionCount of clusters) still work as variant 0. ---- */
+    var variants = [];
+    if (Array.isArray(p.inclusions) && p.inclusions.length) {
+      for (var v0 = 0; v0 < p.inclusions.length && v0 < 72; v0++) {
+        var ve = p.inclusions[v0] || {};
+        variants.push({ material: String(ve.material || 'sea_lantern'), pct: clamp(+ve.pct || 0, 0, 100), count: 0 });
       }
-      inclusionPlaced += placed;
-      if (inclusionPlaced === before) stalls++; else stalls = 0;
+    } else {
+      variants.push({ material: p.inclusionMaterial || 'sea_lantern', pct: inclusionPct, count: 0 });
+    }
+    var inclusionTotal = 0;
+    for (var vi = 0; vi < variants.length; vi++) {
+      var vt = variants[vi];
+      var vtTarget = legacyInc >= 0 ? -1 : Math.round(vt.pct / 100 * hullCount);
+      var vtLimit = legacyInc >= 0 ? legacyInc : 5000;
+      var placed = 0, stalls = 0;
+      for (var inc = 0; inc < vtLimit; inc++) {
+        if (legacyInc < 0 && placed >= vtTarget) break;
+        if (legacyInc < 0 && stalls >= 200) break;
+        if (!hullCells.length) break;
+        var before = placed;
+        var start = hullCells[Math.floor(rand() * hullCells.length)];
+        if (cellType[start] !== 1 || sealedFill[start]) { stalls++; continue; }
+        var size = 3 + Math.floor(rand() * 8);   /* a patch of 3–10 blocks */
+        var queue = [start], seen = {};
+        var placedNow = 0;
+        while (queue.length && placedNow < size) {
+          var q = queue.pop();
+          if (seen[q] || cellType[q] !== 1 || sealedFill[q]) continue;
+          seen[q] = 1;
+          cellType[q] = 2 + vi;
+          placedNow++;
+          var qx = (q / (Y * Z)) | 0, qrm = q - qx * Y * Z, qy = (qrm / Z) | 0, qz = qrm - qy * Z;
+          var opts = [];
+          if (qx > 0) opts.push(q - Y * Z);
+          if (qx < X - 1) opts.push(q + Y * Z);
+          if (qy > 0) opts.push(q - Z);
+          if (qy < Y - 1) opts.push(q + Z);
+          if (qz > 0) opts.push(q - 1);
+          if (qz < Z - 1) opts.push(q + 1);
+          while (opts.length) queue.push(opts.splice(Math.floor(rand() * opts.length), 1)[0]);
+        }
+        placed += placedNow;
+        if (placed === before) stalls++; else stalls = 0;
+      }
+      vt.count = placed;
+      inclusionTotal += placed;
     }
 
-    /* ---- emit: the pure shard (no deck, no drive — you fit the interior) ---- */
+/* ---- emit: the pure shard (no deck, no drive — you fit the interior) ---- */
     var nCells = hullCells.length;
     var positions = new Int16Array(nCells * 3), types = new Uint8Array(nCells);
-    var ci = 0, crystalCount = 0, inclusionTotal = 0;
+    var ci = 0, crystalCount = 0;   /* inclusionTotal is counted during patch placement */
     for (var h4 = 0; h4 < hullCells.length; h4++) {
       var cc = hullCells[h4];
       var cxx = (cc / (Y * Z)) | 0, crm2 = cc - cxx * Y * Z, cyy = (crm2 / Z) | 0, czz = crm2 - cyy * Z;
       /* horizontal: swap the long axis into X (bullet in flight, tip +X).
-         Nose dip: the nose drops by leanX blocks over the shard's length —
-         down (Y) when lying, +X slant when upright. */
-      var tcell = cyy / Math.max(1, H - 1);
-      var dip = Math.round(leanX * tcell);
-      positions[ci * 3] = lying ? cyy : cxx + dip;
-      positions[ci * 3 + 1] = lying ? cxx - dip : cyy;
+         The nose dip is already baked into the slice centers, so this is a
+         pure axis swap — face-adjacency is preserved, the hull is airtight. */
+      positions[ci * 3] = lying ? cyy : cxx;
+      positions[ci * 3 + 1] = lying ? cxx : cyy;
       positions[ci * 3 + 2] = czz;
-      if (cellType[cc] === 2) { types[ci] = INCLUSION; inclusionTotal++; }
+      var vIdx = cellType[cc] - 2;
+      if (vIdx >= 0) types[ci] = vIdx === 0 ? INCLUSION : INCLUSION_V + vIdx - 1;
       else { types[ci] = CRYSTAL; crystalCount++; }
       ci++;
     }
@@ -774,10 +921,8 @@
       for (var gi2 = 0; gi2 < total && si < solid; gi2++) {
         if (!grid[gi2]) continue;
         var gx2 = (gi2 / (Y * Z)) | 0, grm2 = gi2 - gx2 * Y * Z, gy2 = (grm2 / Z) | 0, gz2 = grm2 - gy2 * Z;
-        var tcell2 = gy2 / Math.max(1, H - 1);
-        var dip2 = Math.round(leanX * tcell2);
-        solidPositions[si * 3] = lying ? gy2 : gx2 + dip2;
-        solidPositions[si * 3 + 1] = (lying ? gx2 - dip2 : gy2) + yShift;
+        solidPositions[si * 3] = lying ? gy2 : gx2;
+        solidPositions[si * 3 + 1] = (lying ? gx2 : gy2) + yShift;
         solidPositions[si * 3 + 2] = gz2;
         si++;
       }
@@ -787,12 +932,12 @@
     var steps = [
       { text: 'Start at the tail point and build out to the widest band — this half opens the cavity.', blocks: [] },
       { text: 'Close the nose half down to the tip — the cavity is now sealed.', blocks: [] },
-      { text: 'Set the glowing inclusions into the hull where the guide shows them.', blocks: [] }
+      { text: 'Set the inclusion patches into the hull where the guide shows them.', blocks: [] }
     ];
     var lowEnd = lying ? minX : 0;   /* positions are y-shifted; the tail tip is at minX (lying) or y 0 (upright) */
     for (var i5 = 0; i5 < nCells; i5++) {
       var vv = positions[i5 * 3 + (lying ? 0 : 1)];
-      if (types[i5] === INCLUSION) steps[2].blocks.push(i5);
+      if (isIncType(types[i5])) steps[2].blocks.push(i5);
       else if (vv <= lowEnd + H * tLo + 1) steps[0].blocks.push(i5);
       else steps[1].blocks.push(i5);
     }
@@ -808,6 +953,8 @@
       minX: minX, minY: minY, minZ: minZ, maxX: maxX, maxY: maxY, maxZ: maxZ,
       hollow: hollow,
       crystalCount: crystalCount, inclusionTotal: inclusionTotal, cracksMade: cracksMade, inclusionPct: inclusionPct,
+      inclusions: variants.map(function (vv) { return { material: vv.material, pct: vv.pct, count: vv.count }; }),
+      pocketsFilled: pocketsFilled,
       burners: burners, lift: lift, mass: mass, net: lift - mass,
       blockMass: blockMass, payload: payload, seed: seed,
       facets: n, heightY: H, baseDiagX: BX, baseDiagZ: BZ, midBand: midBand, midY: midY,

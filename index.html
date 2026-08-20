@@ -1133,15 +1133,19 @@ function initEngine(cb) {
   try {
     worker = new Worker('engine-worker.js');
     worker.onmessage = function (e) {
+      if (e.data.error) { onWorkerFailure('generation failed: ' + e.data.error); return; }
       if (e.data.kind === 'solid') onSolidResult(e.data);
       else onGenResult(e.data);
     };
-    worker.onerror = function () {
+    worker.onerror = function (ev) {
       /* worker failed (missing files, engine error, blocked, ...) —
          switch to main-thread mode ONCE instead of recreating workers */
       if (worker) { try { worker.terminate(); } catch (e2) {} worker = null; }
       workerMode = true;
-      loadEngineMain(finish);
+      loadEngineMain(function () {
+        finish();
+        onWorkerFailure('worker unavailable (' + errText(ev) + ') — generating on the main thread', true);
+      });
     };
     workerMode = false;
     finish();
@@ -1151,32 +1155,55 @@ function initEngine(cb) {
     loadEngineMain(function () {});
   } catch (err) {
     /* workers blocked (e.g. file://) — run the engine on the main thread */
+    if (typeof console !== 'undefined' && console.warn) console.warn('[aero] worker unavailable, generating on the main thread: ' + errText(err));
     workerMode = true;
     loadEngineMain(finish);
   }
 }
 function loadEngineMain(cb) {
   if (typeof Gen !== 'undefined' && Gen && Gen.genBalloon) { cb(); return; }
+  var done = false;
   var s = document.createElement('script');
   s.src = 'engine.js';
-  s.onload = function () { cb(); };
+  s.onload = function () { if (!done) { done = true; cb(); } };
   s.onerror = function () {
+    done = true;
     showFatal('engine.js failed to load — keep it next to index.html');
   };
   document.head.appendChild(s);
   /* safety net: if onload never fires, poll for the engine */
   setTimeout(function () {
+    if (done) return;
+    done = true;
     if (typeof Gen !== 'undefined' && Gen && Gen.genBalloon) cb();
+    else showFatal('engine.js did not load — the studio cannot generate models');
   }, 3000);
 }
 function showFatal(msg) {
   /* self-contained: must not depend on late-initialized globals (runs at script-eval time) */
-  try {
-    var note = document.getElementById('subsample-note');
-    note.textContent = '⚠ ' + msg;
-    note.style.color = '#e06c6c';
-    note.classList.remove('hidden');
-  } catch (e) {}
+  if (typeof console !== 'undefined' && console.error) console.error('[aero] ' + msg);
+  var note = document.getElementById('subsample-note');
+  if (!note) return;
+  note.textContent = '⚠ ' + msg;
+  note.style.color = '#e06c6c';
+  note.classList.remove('hidden');
+}
+/* readable text for anything thrown or reported by an error event */
+function errText(e) {
+  if (!e) return 'unknown error';
+  if (e.message) return e.message;
+  if (e.error && e.error.message) return e.error.message;
+  return String(e);
+}
+/* a failed generation must not leave the user with a stale preview and no
+   explanation: report it, drop the dedupe key so the same params regenerate,
+   and release anyone waiting on the cut-section (solid) result. */
+function onWorkerFailure(msg, retry) {
+  lastGenKey = null;
+  if (typeof console !== 'undefined' && console.error) console.error('[aero] ' + msg);
+  if (typeof toast === 'function') toast('✘ ' + msg);
+  if (solidPending) { var cb = solidPending; solidPending = null; cb(); }
+  if (retry && state.tab !== 'lab') requestGen(true);
 }
 function requestGen(immediate) {
   if (pendingTimer) { clearTimeout(pendingTimer); pendingTimer = null; }
@@ -1192,7 +1219,9 @@ function fireGen() {
   var id = ++genSeq;
   if (params.perfect) params.profile = buildHotairProfile(params);
   if (workerMode) {
-    var r = Gen.gen(state.tab, params);
+    var r;
+    try { r = Gen.gen(state.tab, params); }
+    catch (err) { onWorkerFailure('generation failed: ' + errText(err)); return; }
     r.id = id; r.kind = state.tab; r.timeMs = 0;
     onGenResult(r);
   } else {
@@ -1455,13 +1484,18 @@ shadowPlane.receiveShadow = true;
 scene.add(shadowPlane);
 if (shadowFallback) shadowPlane.visible = false;
 /* environment map for metallic materials (casing, iron, brass) */
-try {
-  var pmrem = new THREE.PMREMGenerator(renderer);
-  var envScene = new THREE.Scene();
-  envScene.background = new THREE.Color(0x8a99aa);
-  scene.environment = pmrem.fromScene(envScene).texture;
-  envScene = null;
-} catch (e2) {}
+if (renderer) {
+  try {
+    var pmrem = new THREE.PMREMGenerator(renderer);
+    var envScene = new THREE.Scene();
+    envScene.background = new THREE.Color(0x8a99aa);
+    scene.environment = pmrem.fromScene(envScene).texture;
+    envScene = null;
+  } catch (e2) {
+    /* no env map: metals render matte, everything else is unaffected */
+    if (typeof console !== 'undefined' && console.warn) console.warn('[aero] environment map unavailable: ' + errText(e2));
+  }
+}
 /* real in-game textures: extracted from the vanilla 1.21.1 client jar and the
    exact pack mod jars (textures/ folder). Pixel-filtered like the game. */
 var texLoader = new THREE.TextureLoader();
@@ -1892,6 +1926,12 @@ function blockKey(type, pr, r, p) {
   if (pr && r.propTable && r.propTable[pr]) return name + '|' + JSON.stringify(r.propTable[pr]);
   return name;
 }
+/* the center-marker toggle lives in the export bar; treat a missing control
+   as "off" without hiding real errors behind a catch-all */
+function centerMarkerWanted() {
+  var el = document.getElementById('cb-center');
+  return !!(el && el.checked);
+}
 function buildSchematic(r, p) {
   // trim to tight bbox and shift to origin
   var minX = r.minX, minY = r.minY, minZ = r.minZ;
@@ -1901,8 +1941,7 @@ function buildSchematic(r, p) {
      so pasted builds carry a visible center reference (replaces whatever
      block already sits there). Generators that know their INTERNAL center
      (the crystal's widest cross-section) pin the marker there. */
-  var addCenter = false;
-  try { addCenter = !!document.getElementById('cb-center').checked; } catch (e) {}
+  var addCenter = centerMarkerWanted();
   var cxc = r.center ? r.center.x : Math.floor((r.minX + r.maxX) / 2);
   var cyc = r.center ? r.center.y : Math.floor((r.minY + r.maxY) / 2);
   var czc = r.center ? r.center.z : Math.floor((r.minZ + r.maxZ) / 2);
@@ -1962,8 +2001,7 @@ function buildLitematic(r, p, name) {
   var minX = r.minX, minY = r.minY, minZ = r.minZ;
   var sx = r.maxX - minX + 1, sy = r.maxY - minY + 1, sz = r.maxZ - minZ + 1;
   var vol = sx * sy * sz;
-  var addCenter = false;
-  try { addCenter = !!document.getElementById('cb-center').checked; } catch (e) {}
+  var addCenter = centerMarkerWanted();
   var cxc = r.center ? r.center.x : Math.floor((r.minX + r.maxX) / 2);
   var cyc = r.center ? r.center.y : Math.floor((r.minY + r.maxY) / 2);
   var czc = r.center ? r.center.z : Math.floor((r.minZ + r.maxZ) / 2);
@@ -2084,16 +2122,21 @@ function doDownload(ext) {
     : state.tab + '_' + (p.lengthX || p.halfSpan || '') + 'x' + (p.widthZ || p.rootChord || '');
   if (ext === '.litematic') {
     /* Litematica files are raw NBT — no gzip */
-    downloadBlob(label + '.litematic', buildLitematic(r, p, label));
+    var lit;
+    try { lit = buildLitematic(r, p, label); }
+    catch (err) { toast('✘ export failed: ' + errText(err)); return; }
+    downloadBlob(label + '.litematic', lit);
     toast('Saved ' + label + '.litematic — for Litematica / Forgematica');
     return;
   }
   /* .nbt = gzipped structure NBT — the Create Schematicannon format */
-  var nbt = buildSchematic(r, p);
+  var nbt;
+  try { nbt = buildSchematic(r, p); }
+  catch (err) { toast('✘ export failed: ' + errText(err)); return; }
   gzipBytes(nbt).then(function (ab) {
     downloadBlob(label + ext, ab);
     toast('Saved ' + label + ext + ' — Create schematic, ' + r.count.toLocaleString() + ' blocks');
-  }).catch(function () { toast('gzip failed'); });
+  }).catch(function (err) { toast('✘ gzip failed: ' + errText(err)); });
 }
 document.getElementById('dl-btn').onclick = function () { doDownload('.nbt'); };
 document.getElementById('nbt-btn').onclick = function () { doDownload('.litematic'); };
@@ -2211,7 +2254,11 @@ document.getElementById('share-btn').onclick = function () {
   if (state.tab === 'lab') { toast('Nothing to share — the lab audits your files'); return; }
   var url = shareUrl();
   if (navigator.clipboard) {
-    navigator.clipboard.writeText(url).then(function () { toast('Link copied'); });
+    navigator.clipboard.writeText(url).then(function () { toast('Link copied'); }, function (err) {
+      /* clipboard denied (permissions, insecure context) — show the link instead */
+      if (typeof console !== 'undefined' && console.warn) console.warn('[aero] clipboard write failed: ' + errText(err));
+      toast(url);
+    });
   } else {
     toast(url);
   }
@@ -2222,11 +2269,12 @@ function applyHash() {
   var tab = null, compact = null;
   if (h.charAt(0) === 'b' || h.charAt(0) === 'p') compact = h;
   else {
-    try { compact = unb64u(h); } catch (e) { return; }
+    try { compact = unb64u(h); }
+    catch (e) { toast('✘ unreadable share link: ' + errText(e)); return; }
   }
   var PREFIX_TAB = { b3: 'balloon', p3: 'prop', w4: 'wings', c5: 'crystal', h5: 'shapes' };
   if (PREFIX_TAB[compact.slice(0, 2)]) tab = PREFIX_TAB[compact.slice(0, 2)];
-  else return;
+  else { toast('✘ share link is not a studio link (unknown prefix)'); return; }
   if (state.tab !== tab) switchTab(tab);
   state.params = decodeParams(tab, compact);
   syncControls();
@@ -2339,7 +2387,11 @@ function renderLab(r, name) {
         ' · yaw ' + (brep.yawTwist > 0.5 ? 'twists right' : brep.yawTwist < -0.5 ? 'twists left' : 'straight') +
         ' — <b class="' + (brep.verdict === 'ok' ? '' : 'warn') + '">' + vname(brep.verdict) + '</b>' +
         (brep.fixes.length ? '<br>Fix: ' + brep.fixes.join(' · ') : '') + '</p>';
-    } catch (e2b) {}
+    } catch (e2b) {
+      /* the census above is still valid — say which part failed */
+      html += '<p class="warn">Balance readout unavailable: ' + errText(e2b) + '</p>';
+      if (typeof console !== 'undefined' && console.error) console.error('[aero] balance readout failed', e2b);
+    }
   })();
   html += '<p><button class="hbtn" id="lab-view">View in 3D</button> ' +
     '<button class="hbtn" id="lab-balance">Check inside the Crystal tab</button></p>';
@@ -2464,9 +2516,18 @@ function fetchSolidResult(cb) {
     solidPending = cb;
     worker.postMessage({ id: 0, kind: 'solid', solidOf: state.tab === 'crystal' ? 'crystal' : 'balloon', params: Object.assign({}, state.params) });
   } else {
-    var r = state.tab === 'crystal'
-      ? Gen.genCrystal(Object.assign({}, state.params, { includeSolid: true }))
-      : Gen.genBalloon(Object.assign({}, state.params, { includeSolid: true }));
+    var r;
+    try {
+      r = state.tab === 'crystal'
+        ? Gen.genCrystal(Object.assign({}, state.params, { includeSolid: true }))
+        : Gen.genBalloon(Object.assign({}, state.params, { includeSolid: true }));
+    } catch (err) {
+      /* no cut-section data: fall back to the no-solid path and say so */
+      onSolidResult({});
+      toast('✘ cut-section unavailable: ' + errText(err));
+      cb();
+      return;
+    }
     r.kind = 'solid';
     onSolidResult(r);
     cb();

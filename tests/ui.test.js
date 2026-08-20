@@ -599,6 +599,75 @@ test('ui: prop force-one-block-center checkbox drives the param and regenerates'
   assert.strictEqual(hub, 1, 'exactly one hub with forceCenter on');
 });
 
+/* ---------- error propagation ---------- */
+test('ui: a worker generation error is reported, not swallowed', async () => {
+  const ctx = boot();
+  await tick();
+  /* the worker reports failures on the message channel (engine-worker.js) */
+  ctx.worker.postMessage = function (msg) {
+    setTimeout(() => ctx.worker.onmessage({ data: { id: msg.id, kind: msg.kind, error: 'shell too thick' } }), 1);
+  };
+  els['toast'].textContent = '';
+  ctx.state.params.lengthX = 47;
+  ctx.requestGen(true);
+  await tick(); await tick();
+  assert.ok(els['toast'].textContent.includes('shell too thick'), 'toast carries the engine message: ' + els['toast'].textContent);
+  assert.strictEqual(ctx.lastGenKey, null, 'dedupe key dropped so the same params can be retried');
+});
+
+test('ui: a dead worker falls back to the main thread AND regenerates', async () => {
+  const ctx = boot();
+  await tick();
+  els['toast'].textContent = '';
+  ctx.state.result = null;
+  ctx.worker.onerror(new Error('worker died'));
+  await tick(); await tick();
+  assert.strictEqual(ctx.workerMode, true, 'switched to main-thread mode');
+  assert.ok(els['toast'].textContent.includes('worker died'), 'failure reported: ' + els['toast'].textContent);
+  assert.ok(ctx.state.result && ctx.state.result.count > 0, 'the dropped generation was re-run on the main thread');
+});
+
+test('ui: a main-thread generation failure surfaces and stays retryable', async () => {
+  const ctx = boot();
+  await tick();
+  ctx.workerMode = true;
+  const realGen = ctx.Gen.gen;
+  ctx.Gen.gen = () => { throw new Error('bad params'); };
+  els['toast'].textContent = '';
+  ctx.state.params.lengthX = 48;
+  ctx.requestGen(true);
+  await tick();
+  assert.ok(els['toast'].textContent.includes('bad params'), 'toast carries the failure: ' + els['toast'].textContent);
+  assert.strictEqual(ctx.lastGenKey, null);
+  ctx.Gen.gen = realGen;
+  ctx.requestGen(true);
+  await tick();
+  assert.ok(ctx.state.result.count > 0, 'the same params regenerate after the failure');
+});
+
+test('ui: a broken share link says so instead of failing silently', async () => {
+  const ctx = boot();
+  await tick();
+  els['toast'].textContent = '';
+  ctx.location.hash = '#@@@@@@@@';
+  ctx.applyHash();
+  assert.ok(els['toast'].textContent.includes('unreadable share link'), 'decode failure reported: ' + els['toast'].textContent);
+  els['toast'].textContent = '';
+  ctx.location.hash = '#' + ctx.b64u('zz9.1.2');
+  ctx.applyHash();
+  assert.ok(els['toast'].textContent.includes('not a studio link'), 'unknown prefix reported: ' + els['toast'].textContent);
+});
+
+test('ui: a failed export reports the reason', async () => {
+  const ctx = boot();
+  await tick();
+  els['toast'].textContent = '';
+  /* a result whose types array is missing: the NBT writer throws */
+  ctx.state.result = { count: 3, positions: new Int16Array(9), types: null, minX: 0, minY: 0, minZ: 0, maxX: 1, maxY: 1, maxZ: 1 };
+  ctx.doDownload('.nbt');
+  assert.ok(els['toast'].textContent.includes('export failed'), 'export failure reported: ' + els['toast'].textContent);
+});
+
 test('ui: stat labels switch per tab and machines/ships/math are gone', async () => {
   const ctx = boot();
   assert.ok(!('machines' in ctx.MODULES) && !('ships' in ctx.MODULES) && !('math' in ctx.MODULES), 'cleared modules removed');

@@ -1578,6 +1578,11 @@
      Properties) and a blocks list of pos/state. Parsed client-side so
      the lab can audit any schematic: material totals, mass, and a
      Create Aeronautics block census. */
+  /* readable text for any thrown value (Error, DOMException, string) */
+  function errText(e) {
+    if (!e) return 'unknown error';
+    return e.message || String(e);
+  }
   function inflateGz(bytes) {
     if (typeof DecompressionStream !== 'undefined') {
       var stream = new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')));
@@ -1671,7 +1676,10 @@
         for (i = 0; i < len; i++) arr[i] = dv.getBigInt64(off + i * 8);
         return { value: arr, off: off + len * 8 };
     }
-    return { value: null, off: off };
+    /* an unknown tag makes the rest of the stream unreadable: its payload
+       length is unknown, so every following offset would be wrong. Fail
+       loudly instead of returning null and parsing garbage. */
+    throw new Error('unsupported NBT tag ' + tag + ' at offset ' + off);
   }
 
   function analyzeSchematic(bytes, opts) {
@@ -1684,7 +1692,7 @@
       var buf = new Uint8Array(ab);
       var root;
       try { root = nbtRead(buf); }
-      catch (e) { return { ok: false, error: 'corrupt NBT data' }; }
+      catch (e) { return { ok: false, error: 'corrupt NBT data: ' + errText(e) }; }
       if (root.tag !== 10) return { ok: false, error: 'not an NBT root compound' };
       var v = root.value;
       var palette = [];
@@ -1818,7 +1826,7 @@
         mass: total * bm + pl, blockMass: bm, payload: pl
       };
     }, function (err) {
-      return { ok: false, error: 'gzip inflate failed: ' + err };
+      return { ok: false, error: 'gzip inflate failed: ' + errText(err) };
     });
   }
 
@@ -1836,6 +1844,7 @@
     genWings: genWings, genCrystal: genCrystal, genShapes: genShapes,
     mathFor: mathFor, propMath: propMath,
     analyzeSchematic: analyzeSchematic, nbtRead: nbtRead, inflateGz: inflateGz,
+    errText: errText,
     massOf: massOf, comFor: comFor, blocksToResult: blocksToResult,
     comCheck: comCheck, overlay: overlay, balanceReport: balanceReport,
     mulberry32: mulberry32,

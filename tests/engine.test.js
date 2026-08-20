@@ -3,6 +3,9 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const zlib = require('node:zlib');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
 
 require('../engine.js');
 const Gen = globalThis.Gen;
@@ -607,6 +610,63 @@ test('schematic lab: rejects garbage', async () => {
   assert.strictEqual(r2.ok, false);
 });
 
+
+test('schematic lab: an unsupported NBT tag fails loudly instead of parsing garbage', async () => {
+  /* root compound holding one field with tag 13 (does not exist): the payload
+     length is unknown, so continuing would desync every following offset */
+  const b = [10, 0, 0, 13, 0, 1, 0x78, 1, 2, 3, 4, 0];
+  const r = await Gen.analyzeSchematic(Uint8Array.from(b));
+  assert.strictEqual(r.ok, false);
+  assert.match(r.error, /unsupported NBT tag 13/, 'error names the offending tag: ' + r.error);
+});
+
+test('schematic lab: parse errors carry the underlying reason', async () => {
+  /* a truncated compound: the DataView read runs off the end */
+  const b = [10, 0, 0, 3, 0, 1, 0x61, 0, 0];
+  const r = await Gen.analyzeSchematic(Uint8Array.from(b));
+  assert.strictEqual(r.ok, false);
+  assert.match(r.error, /^corrupt NBT data: .+/, 'reason kept: ' + r.error);
+  const badGz = new Uint8Array([0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 3, 1, 2, 3]);
+  const r2 = await Gen.analyzeSchematic(badGz);
+  assert.strictEqual(r2.ok, false);
+  assert.match(r2.error, /^gzip inflate failed: .+/, 'inflate reason kept: ' + r2.error);
+  assert.strictEqual(Gen.errText(new Error('boom')), 'boom');
+  assert.strictEqual(Gen.errText(null), 'unknown error');
+});
+
+/* ---------- worker error propagation ---------- */
+/* boot engine-worker.js the way a real worker does: importScripts pulls the
+   engine into the same global, and self carries onmessage/postMessage */
+function bootWorker() {
+  const ctx = vm.createContext({ console, performance: { now: () => 0 } });
+  const posted = [];
+  ctx.__post = (m) => posted.push(m);
+  vm.runInContext('self = globalThis; self.postMessage = __post;', ctx);
+  const root = path.join(__dirname, '..');
+  ctx.importScripts = () => new vm.Script(fs.readFileSync(path.join(root, 'engine.js'), 'utf8')).runInContext(ctx);
+  new vm.Script(fs.readFileSync(path.join(root, 'engine-worker.js'), 'utf8')).runInContext(ctx);
+  return { ctx, posted };
+}
+
+test('worker: a generation failure is posted back, not left as an opaque onerror', () => {
+  const { ctx, posted } = bootWorker();
+  vm.runInContext('Gen.gen = function () { throw new Error("bad slider"); };', ctx);
+  ctx.self.onmessage({ data: { id: 7, kind: 'crystal', params: {} } });
+  assert.strictEqual(posted.length, 1);
+  /* the object comes from the worker realm, so compare fields, not identity */
+  assert.strictEqual(posted[0].id, 7);
+  assert.strictEqual(posted[0].kind, 'crystal');
+  assert.strictEqual(posted[0].error, 'bad slider');
+});
+
+test('worker: successful generation still posts the model', () => {
+  const { ctx, posted } = bootWorker();
+  ctx.self.onmessage({ data: { id: 3, kind: 'shapes', params: {} } });
+  assert.strictEqual(posted.length, 1);
+  assert.strictEqual(posted[0].id, 3);
+  assert.strictEqual(posted[0].error, undefined);
+  assert.ok(posted[0].count > 0);
+});
 
 test('schematic lab: legacy pre-1.20.2 list wrappers also parse', async () => {
   const b = [];

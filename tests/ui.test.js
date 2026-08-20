@@ -218,6 +218,25 @@ function boot() {
 const fastSetTimeout = (fn, ms, ...a) => setTimeout(fn, ms > 20 ? Math.min(ms, 10) : ms, ...a);
 const tick = () => new Promise((r) => setTimeout(r, 10));
 
+function buildXssSchem(name) {
+  const b = [];
+  const u8 = (v) => b.push(v & 0xff);
+  const i16 = (v) => { b.push((v >> 8) & 0xff, v & 0xff); };
+  const i32 = (v) => { b.push((v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff); };
+  const str = (s) => { const e = new TextEncoder().encode(s); i16(e.length); for (const c of e) u8(c); };
+  const tagName = (tag, n) => { u8(tag); str(n); };
+  const compound = (fn) => { fn(); u8(0); };
+  const strF = (n, v) => { tagName(8, n); str(v); };
+  const intList = (n, vals) => { tagName(9, n); u8(3); i32(vals.length); for (const v of vals) i32(v); };
+  u8(10); i16(0);
+  tagName(9, 'palette'); u8(10); i32(1);
+  compound(() => { strF('Name', name); });
+  tagName(9, 'blocks'); u8(10); i32(1);
+  compound(() => { intList('pos', [0, 0, 0]); tagName(3, 'state'); i32(0); });
+  u8(0);
+  return Uint8Array.from(b);
+}
+
 test('ui: boots with the balloon tab generating', async () => {
   const ctx = boot();
   await tick();
@@ -269,6 +288,28 @@ test('ui: share links round-trip for every tab (params survive encode/decode)', 
       }
     }
   }
+});
+
+test('ui: crafted share links reject inclusion XSS and clamp numerics', async () => {
+  const ctx = boot();
+  await tick();
+  const compact = ctx.encodeParams('crystal', Object.assign({}, ctx.MODULES.crystal.def, {
+    inclusions: [{ material: '<img src=x onerror=alert(1)>', pct: 9999 }]
+  }));
+  const parts = compact.split('.');
+  parts[parts.length - 1] = '<img src=x onerror=alert(1)>:9999';
+  ctx.location.hash = '#' + ctx.b64u(parts.join('.'));
+  ctx.applyHash();
+  await tick(); await tick();
+  assert.strictEqual(ctx.state.params.inclusions[0].material, 'sea_lantern');
+  assert.strictEqual(ctx.state.params.inclusions[0].pct, 100);
+  assert.ok(!els['req-body'].innerHTML.includes('<img'), 'share-link payload is not rendered as HTML');
+
+  const balloon = ctx.decodeParams('balloon', 'b3.1e9.NaN.-5');
+  assert.strictEqual(balloon.lengthX, 500);
+  assert.strictEqual(balloon.widthZ, ctx.MODULES.balloon.def.widthZ);
+  assert.strictEqual(balloon.heightY, 4);
+  assert.ok(Number.isFinite(balloon.lengthX) && Number.isFinite(balloon.widthZ) && Number.isFinite(balloon.heightY));
 });
 
 test('ui: a shared crystal link routes, regenerates and reproduces the same shard', async () => {
@@ -362,6 +403,25 @@ test('ui: lab rejects garbage files gracefully', async () => {
   fileEl.onchange();
   await tick(); await tick();
   assert.ok(els['lab-out'].innerHTML.includes('✘'), 'error rendered');
+});
+
+test('ui: lab escapes hostile file and palette names', async () => {
+  const ctx = boot();
+  await tick();
+  ctx.switchTab('lab');
+  await tick();
+  const payload = '<img src=x onerror=alert(1)>';
+  const fileEl = els['lab-file'];
+  fileEl.files = [{
+    name: '"><img src=x onerror=alert(2)>',
+    arrayBuffer: async () => buildXssSchem('minecraft:' + payload).buffer
+  }];
+  fileEl.onchange();
+  await tick(); await tick();
+  const out = els['lab-out'].innerHTML;
+  assert.ok(out.includes('&lt;img src=x onerror=alert(1)&gt;'), 'palette payload escaped');
+  assert.ok(out.includes('&lt;img src=x onerror=alert(2)&gt;'), 'file-name payload escaped');
+  assert.ok(!out.includes('<img'), 'no executable image tag remains');
 });
 
 test('ui: every handbook link in wiki.html decodes and generates', async () => {

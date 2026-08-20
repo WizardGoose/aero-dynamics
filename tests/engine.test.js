@@ -546,7 +546,7 @@ test('dispatch: known kinds route, removed kinds fall back to balloon', () => {
 });
 
 /* ---------- schematic lab ---------- */
-function buildTinySchem() {
+function buildTinySchem(paletteName) {
   const b = [];
   const u8 = (v) => b.push(v & 0xff);
   const i16 = (v) => { b.push((v >> 8) & 0xff, v & 0xff); };
@@ -563,7 +563,7 @@ function buildTinySchem() {
   intList('size', [3, 1, 2]);
   /* palette: [burner, air] */
   tagName(9, 'palette'); u8(10); i32(2);
-  compound(() => { strF('Name', 'aeronautics:adjustable_burner'); tagName(10, 'Properties'); strF('powered', 'false'); u8(0); });
+  compound(() => { strF('Name', paletteName || 'aeronautics:adjustable_burner'); tagName(10, 'Properties'); strF('powered', 'false'); u8(0); });
   compound(() => { strF('Name', 'minecraft:air'); });
   /* blocks: [{pos,state} x2] */
   tagName(9, 'blocks'); u8(10); i32(2);
@@ -605,6 +605,20 @@ test('schematic lab: rejects garbage', async () => {
   const badGz = new Uint8Array([0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 3, 1, 2, 3]);
   const r2 = await Gen.analyzeSchematic(badGz);
   assert.strictEqual(r2.ok, false);
+});
+
+test('schematic lab: rejects oversized and bounds-violating NBT without throwing', async () => {
+  /* A byte-array length larger than the remaining buffer must not allocate. */
+  const oversized = Uint8Array.from([10, 0, 0, 7, 0, 0, 0, 127, 127, 127, 127, 0]);
+  const r = await Gen.analyzeSchematic(oversized);
+  assert.strictEqual(r.ok, false);
+  assert.match(r.error, /corrupt NBT data/);
+
+  /* A truncated primitive must resolve to the normal failure shape. */
+  const truncated = Uint8Array.from([10, 0, 0, 3, 0, 1, 0]);
+  const r2 = await Gen.analyzeSchematic(truncated);
+  assert.strictEqual(r2.ok, false);
+  assert.match(r2.error, /corrupt NBT data/);
 });
 
 

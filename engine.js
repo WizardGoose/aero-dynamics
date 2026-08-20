@@ -1578,65 +1578,97 @@
      Properties) and a blocks list of pos/state. Parsed client-side so
      the lab can audit any schematic: material totals, mass, and a
      Create Aeronautics block census. */
+  /* A few hundred megabytes is far beyond any practical schematic here, but
+     still leaves room for unusually large real-world builds. */
+  var MAX_SCHEMATIC_BYTES = 256 * 1024 * 1024;
   function inflateGz(bytes) {
     if (typeof DecompressionStream !== 'undefined') {
       var stream = new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')));
-      return stream.arrayBuffer();
+      var reader = stream.body.getReader(), chunks = [], total = 0;
+      var read = function () {
+        return reader.read().then(function (part) {
+          if (part.done) {
+            var out = new Uint8Array(total), at = 0;
+            for (var i = 0; i < chunks.length; i++) { out.set(chunks[i], at); at += chunks[i].length; }
+            return out.buffer;
+          }
+          total += part.value.byteLength;
+          if (total > MAX_SCHEMATIC_BYTES) {
+            reader.cancel();
+            throw new Error('decompressed schematic exceeds ' + MAX_SCHEMATIC_BYTES + ' bytes');
+          }
+          chunks.push(part.value);
+          return read();
+        });
+      };
+      return read();
     }
     return Promise.reject(new Error('no DecompressionStream'));
   }
 
+  function nbtNeed(dv, off, n) {
+    if (!Number.isSafeInteger(off) || !Number.isSafeInteger(n) || n < 0 || off < 0 || off > dv.byteLength - n) {
+      throw new Error('NBT buffer bounds exceeded');
+    }
+  }
+  function nbtU8(dv, off) { nbtNeed(dv, off, 1); return dv.getUint8(off); }
+  function nbtU16(dv, off) { nbtNeed(dv, off, 2); return dv.getUint16(off); }
+  function nbtI32(dv, off) { nbtNeed(dv, off, 4); return dv.getInt32(off); }
+  function nbtReadName(dv, off) {
+    var len = nbtU16(dv, off); off += 2;
+    nbtNeed(dv, off, len);
+    var name = '';
+    for (var i = 0; i < len; i++) name += String.fromCharCode(dv.getUint8(off + i));
+    return { value: name, off: off + len };
+  }
   function nbtRead(buf, off) {
     off = off || 0;
-    var tag = buf[off]; off++;
-    if (tag === 0) return { tag: 0, name: '', value: null, off: off };
-    var nameLen = (buf[off] << 8) | buf[off + 1]; off += 2;
-    var name = '';
-    for (var i = 0; i < nameLen; i++) name += String.fromCharCode(buf[off + i]);
-    off += nameLen;
     var dv = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
-    var r = nbtPayload(tag, dv, off);
-    return { tag: tag, name: name, value: r.value, off: r.off };
+    var tag = nbtU8(dv, off); off++;
+    if (tag === 0) return { tag: 0, name: '', value: null, off: off };
+    var named = nbtReadName(dv, off);
+    var r = nbtPayload(tag, dv, named.off);
+    return { tag: tag, name: named.value, value: r.value, off: r.off };
   }
   function nbtPayload(tag, dv, off) {
-    var i, len, str, arr, lst, ent, v, comp = {};
+    var i, len, str, arr, lst, comp = {};
     switch (tag) {
-      case 1: return { value: dv.getInt8(off), off: off + 1 };
-      case 2: return { value: dv.getInt16(off), off: off + 2 };
-      case 3: return { value: dv.getInt32(off), off: off + 4 };
-      case 4: return { value: dv.getBigInt64(off), off: off + 8 };
-      case 5: return { value: dv.getFloat32(off), off: off + 4 };
-      case 6: return { value: dv.getFloat64(off), off: off + 8 };
+      case 1: nbtNeed(dv, off, 1); return { value: dv.getInt8(off), off: off + 1 };
+      case 2: nbtNeed(dv, off, 2); return { value: dv.getInt16(off), off: off + 2 };
+      case 3: nbtNeed(dv, off, 4); return { value: dv.getInt32(off), off: off + 4 };
+      case 4: nbtNeed(dv, off, 8); return { value: dv.getBigInt64(off), off: off + 8 };
+      case 5: nbtNeed(dv, off, 4); return { value: dv.getFloat32(off), off: off + 4 };
+      case 6: nbtNeed(dv, off, 8); return { value: dv.getFloat64(off), off: off + 8 };
       case 7:
-        len = dv.getInt32(off); off += 4;
-        arr = new Uint8Array(len);
-        for (i = 0; i < len; i++) arr[i] = dv.getUint8(off + i);
+        len = nbtI32(dv, off); off += 4;
+        nbtNeed(dv, off, len);
+        arr = new Uint8Array(dv.buffer.slice(dv.byteOffset + off, dv.byteOffset + off + len));
         return { value: arr, off: off + len };
       case 8:
-        len = dv.getUint16(off); off += 2;
+        len = nbtU16(dv, off); off += 2;
+        nbtNeed(dv, off, len);
         str = '';
         for (i = 0; i < len; i++) str += String.fromCharCode(dv.getUint8(off + i));
         return { value: str, off: off + len };
       case 9:
-        var et = dv.getUint8(off); off += 1;
-        len = dv.getInt32(off); off += 4;
+        var et = nbtU8(dv, off); off++;
+        len = nbtI32(dv, off); off += 4;
+        if (len < 0 || (et === 0 && len !== 0) || (et !== 0 && len > dv.byteLength - off)) {
+          throw new Error('invalid NBT list length');
+        }
         lst = [];
-        if (et === 0) return { value: lst, off: off };
         for (i = 0; i < len; i++) {
           if (et === 10) {
             comp = {};
             while (true) {
-              var nt = dv.getUint8(off);
-              if (nt === 0) { off++; break; }
+              var nt = nbtU8(dv, off); off++;
+              if (nt === 0) break;
               /* legacy (pre-1.20.2) schematics wrap each list member in an
                  empty-name compound (0a 00 00) — peek and skip it */
-              if (nt === 10 && dv.getUint16(off + 1) === 0) { off += 3; continue; }
-              var nl = dv.getUint16(off + 1); off += 3;
-              var nm = '';
-              for (var j = 0; j < nl; j++) nm += String.fromCharCode(dv.getUint8(off + j));
-              off += nl;
-              var np = nbtPayload(nt, dv, off);
-              comp[nm] = { tag: nt, value: np.value };
+              if (nt === 10 && nbtU16(dv, off) === 0) { off += 2; continue; }
+              var named2 = nbtReadName(dv, off);
+              var np = nbtPayload(nt, dv, named2.off);
+              comp[named2.value] = { tag: nt, value: np.value };
               off = np.off;
             }
             lst.push(comp);
@@ -1649,34 +1681,36 @@
         return { value: lst, off: off };
       case 10:
         while (true) {
-          var t2 = dv.getUint8(off);
-          if (t2 === 0) { off++; break; }
-          var nl2 = dv.getUint16(off + 1); off += 3;
-          var nm2 = '';
-          for (var j2 = 0; j2 < nl2; j2++) nm2 += String.fromCharCode(dv.getUint8(off + j2));
-          off += nl2;
-          var r2 = nbtPayload(t2, dv, off);
-          comp[nm2] = { tag: t2, value: r2.value };
+          var t2 = nbtU8(dv, off); off++;
+          if (t2 === 0) break;
+          var named3 = nbtReadName(dv, off);
+          var r2 = nbtPayload(t2, dv, named3.off);
+          comp[named3.value] = { tag: t2, value: r2.value };
           off = r2.off;
         }
         return { value: comp, off: off };
       case 11:
-        len = dv.getInt32(off); off += 4;
+        len = nbtI32(dv, off); off += 4;
+        if (len < 0 || len > Math.floor((dv.byteLength - off) / 4)) throw new Error('invalid NBT int array length');
         arr = new Int32Array(len);
         for (i = 0; i < len; i++) arr[i] = dv.getInt32(off + i * 4);
         return { value: arr, off: off + len * 4 };
       case 12:
-        len = dv.getInt32(off); off += 4;
+        len = nbtI32(dv, off); off += 4;
+        if (len < 0 || len > Math.floor((dv.byteLength - off) / 8)) throw new Error('invalid NBT long array length');
         arr = new Array(len);
         for (i = 0; i < len; i++) arr[i] = dv.getBigInt64(off + i * 8);
         return { value: arr, off: off + len * 8 };
     }
-    return { value: null, off: off };
+    throw new Error('unknown NBT tag ' + tag);
   }
 
   function analyzeSchematic(bytes, opts) {
     opts = opts || {};
     var u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+    if (u8.byteLength > MAX_SCHEMATIC_BYTES) {
+      return Promise.resolve({ ok: false, error: 'schematic exceeds ' + MAX_SCHEMATIC_BYTES + ' bytes' });
+    }
     var isGz = u8.length > 2 && u8[0] === 0x1f && u8[1] === 0x8b;
     var work = isGz ? inflateGz(u8)
       : Promise.resolve(u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength));

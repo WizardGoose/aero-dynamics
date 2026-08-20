@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; worker-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='42' r='30' fill='%23ffb347'/><rect x='44' y='66' width='12' height='14' fill='%23d8dcdc'/><path d='M34 82 L50 66 L66 82' fill='none' stroke='%23d8dcdc' stroke-width='4'/></svg>">
 <title>Aero-Dynamics — Create Aeronautics Ship &amp; Shape Studio</title>
 <style>  :root {
@@ -677,7 +678,7 @@ var CTLS = {
     { t: 'range', k: 'jitter',         label: 'Vertex jitter',       min: 0,  max: 0.4, step: 0.01 },
     { t: 'range', k: 'asym',           label: 'Asymmetry (X vs Z taper)', min: 0, max: 0.5, step: 0.01 },
     { t: 'range', k: 'crackCount',     label: 'Cracks',              min: 0,  max: 20, step: 1, num: true },
-    { t: 'seed',  k: 'seed',           label: 'Seed (re-rolls every imperfection)' },
+    { t: 'seed',  k: 'seed',           label: 'Seed (re-rolls every imperfection)', min: 0, max: 9999 },
     { t: 'group', label: 'Materials' },
     { t: 'sel',   k: 'material',       label: 'Crystal material',    opts: ['glass', 'tinted_glass', 'white_stained_glass', 'orange_stained_glass', 'magenta_stained_glass', 'light_blue_stained_glass', 'yellow_stained_glass', 'lime_stained_glass', 'pink_stained_glass', 'gray_stained_glass', 'light_gray_stained_glass', 'cyan_stained_glass', 'purple_stained_glass', 'blue_stained_glass', 'brown_stained_glass', 'green_stained_glass', 'red_stained_glass', 'black_stained_glass', 'amethyst_block', 'levitite', 'pearlescent_levitite'] },
     { t: 'inclusions', k: 'inclusions', label: 'Inclusion patches (% of hull each)' },
@@ -706,6 +707,22 @@ var CTLS = {
   lab: [],
 };
 
+var CTL_BOUNDS = {};
+for (var _ctab in CTLS) {
+  CTL_BOUNDS[_ctab] = {};
+  for (var _ci = 0; _ci < CTLS[_ctab].length; _ci++) {
+    var _cc = CTLS[_ctab][_ci];
+    if (_cc.k && ((_cc.t === 'range' && _cc.min !== undefined && _cc.max !== undefined) ||
+        (_cc.t === 'seed' && _cc.min !== undefined && _cc.max !== undefined))) {
+      CTL_BOUNDS[_ctab][_cc.k] = { min: _cc.min, max: _cc.max, integer: _cc.t === 'seed' || _cc.step >= 1 };
+    } else if (_cc.k && _cc.t === 'seg' && _cc.nums && _cc.opts && _cc.opts.length) {
+      CTL_BOUNDS[_ctab][_cc.k] = {
+        min: Math.min.apply(Math, _cc.opts), max: Math.max.apply(Math, _cc.opts), integer: true
+      };
+    }
+  }
+}
+
 /* ================= inclusion variant editor =================
    A crystal's inclusions are patchwork variants — each is a material with
    its own share of the hull, generated as seeded patches. Any mix works:
@@ -722,6 +739,14 @@ var INC_MATS = [];
     if (!seen[im2]) { seen[im2] = 1; INC_MATS.push(im2); }
   }
 })();
+function escapeHtml(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 function isIncType(t) { return t === INCLUSION || (t >= INCLUSION_V && t < 100); }
 function incIndexOf(t) { return t === INCLUSION ? 0 : t - INCLUSION_V + 1; }
 function incMaterialAt(p, i) {
@@ -1263,7 +1288,7 @@ function updateStats(r) {
     var asp = span * span / Math.max(1, r.area);
     set('st-waste', asp.toFixed(1));
     set('st-eff', '—');
-    badge.innerHTML = '<span class="badge solid">' + p.planform + ' · ' + p.wingBlock.replace('copycat_', '') + '</span>';
+    badge.innerHTML = '<span class="badge solid">' + escapeHtml(p.planform) + ' · ' + escapeHtml(p.wingBlock.replace('copycat_', '')) + '</span>';
   } else if (tab === 'crystal') {
     set('st-interior', r.interior.toLocaleString());
     set('st-burners', r.burners + ' (' + (r.burners * 500).toLocaleString() + ' covered)');
@@ -1280,7 +1305,7 @@ function updateStats(r) {
     set('st-burners', r.kind);
     set('st-waste', r.hollow ? 'hollow · ' + (r.shell || 1) + '-thick' : 'solid');
     set('st-eff', '—');
-    badge.innerHTML = '<span class="badge solid">' + r.kind + ' · ' + r.count.toLocaleString() + ' blocks · interior ' + r.interior.toLocaleString() + '</span>';
+    badge.innerHTML = '<span class="badge solid">' + escapeHtml(r.kind) + ' · ' + r.count.toLocaleString() + ' blocks · interior ' + r.interior.toLocaleString() + '</span>';
   }
   updateReq(r);
 }
@@ -1306,22 +1331,22 @@ function updateReq(r) {
     html += '<span class="req-formula">lift = interior × 1.5 · burners = ceil(interior / 500)</span>';
   } else if (tab === 'prop') {
     var pm2 = Gen.propMath(p, r);
-    html += '<span>Blades: <b>' + pm2.blades + '</b> · ' + pm2.total.toLocaleString() + ' ' + pm2.material + ' blocks (' + pm2.perBlade.toFixed(1) + ' per blade)</span>';
+    html += '<span>Blades: <b>' + pm2.blades + '</b> · ' + pm2.total.toLocaleString() + ' ' + escapeHtml(pm2.material) + ' blocks (' + pm2.perBlade.toFixed(1) + ' per blade)</span>';
     html += '<span>Swept disc: <b>Ø ' + pm2.discDia + ' blocks</b> · area π×' + p.length + '² = ' + Math.round(pm2.discArea).toLocaleString() + '</span>';
     html += '<span>Blade coverage: <b>' + (pm2.solidity * 100).toFixed(0) + '%</b> of the disc</span>';
     html += '<span>Mount: <b>1× propeller_bearing</b> on a rotating Create shaft' + (pm2.blades >= 5 ? ' (high blade counts want a rotation_speed_controller)' : '') + '</span>';
     html += '<span class="req-formula">disc area = π × length² · bearing = 1 per propeller</span>';
   } else if (tab === 'wings') {
-    html += '<span>Wing blocks: <b>' + r.area.toLocaleString() + '× ' + (p.wingBlock || 'copycat_wing') + '</b></span>';
-    html += '<span>Span: <b>' + (p.mirror ? p.halfSpan * 2 : p.halfSpan) + ' blocks</b> · planform: ' + p.planform + '</span>';
+    html += '<span>Wing blocks: <b>' + r.area.toLocaleString() + '× ' + escapeHtml(p.wingBlock || 'copycat_wing') + '</b></span>';
+    html += '<span>Span: <b>' + (p.mirror ? p.halfSpan * 2 : p.halfSpan) + ' blocks</b> · planform: ' + escapeHtml(p.planform) + '</span>';
     html += '<span class="req-formula">copycat wings are 16×8/12/14×16 px flat panels — place on your ship, force acts at each block</span>';
   } else if (tab === 'crystal') {
     var cm = Gen.mathFor(r, p.blockMass, p.payload);
     var incBits = [];
     if (r.inclusions) for (var ix2 = 0; ix2 < r.inclusions.length; ix2++) {
-      if (r.inclusions[ix2].count) incBits.push(r.inclusions[ix2].count + ' ' + r.inclusions[ix2].material.replace(/_/g, ' '));
+      if (r.inclusions[ix2].count) incBits.push(r.inclusions[ix2].count + ' ' + escapeHtml(r.inclusions[ix2].material.replace(/_/g, ' ')));
     }
-    html += '<span>Shard hull: <b>' + r.crystalCount.toLocaleString() + ' ' + p.material.replace(/_/g, ' ') + '</b>' + (incBits.length ? ' + ' + incBits.join(' · ') : '') + (r.cracksMade ? ' · ' + r.cracksMade + ' crack' + (r.cracksMade > 1 ? 's' : '') : '') + '</span>';
+    html += '<span>Shard hull: <b>' + r.crystalCount.toLocaleString() + ' ' + escapeHtml(p.material.replace(/_/g, ' ')) + '</b>' + (incBits.length ? ' + ' + incBits.join(' · ') : '') + (r.cracksMade ? ' · ' + r.cracksMade + ' crack' + (r.cracksMade > 1 ? 's' : '') : '') + '</span>';
     html += '<span>Center: <b>' + (r.centerMode === 'even' ? 'even — the middle lands on a 2×2 junction' : 'odd — single block at the middle') + '</b> · nose dip ' + r.leanX + ' block' + (r.leanX === 1 ? '' : 's') + '</span>';
     html += '<span>Cavity (your interior): <b>' + r.interior.toLocaleString() + ' blocks</b> → lift ' + cm.lift.toLocaleString() + '</span>';
     html += '<span>Burners: <b>' + cm.burners + '</b>' + (cm.waste ? ' (' + cm.waste.toLocaleString() + ' waste)' : ' (exact ✔)') + '</span>';
@@ -1350,10 +1375,10 @@ function updateReq(r) {
         (cb.verdict === 'ok' ? '✔ PERFECTLY STRAIGHT' : (cb.verdict === 'wonky' ? '⚠ WONKY' : '✘ UNEVEN')) + '</span>';
     }
   } else if (tab === 'shapes') {
-    html += '<span>Blocks: <b>' + r.count.toLocaleString() + '</b> of ' + p.material + (p.material === 'wool' ? ' (' + p.envelopeColor + ')' : '') + (p.material === 'planks' || p.material === 'log' ? ' (' + p.frameWoodType + ')' : '') + '</span>';
+    html += '<span>Blocks: <b>' + r.count.toLocaleString() + '</b> of ' + escapeHtml(p.material) + (p.material === 'wool' ? ' (' + escapeHtml(p.envelopeColor) + ')' : '') + (p.material === 'planks' || p.material === 'log' ? ' (' + escapeHtml(p.frameWoodType) + ')' : '') + '</span>';
     html += '<span>Interior: <b>' + r.interior.toLocaleString() + ' blocks</b> (' + (r.hollow ? 'hollow' : 'solid') + ')</span>';
     html += '<span>Size: <b>' + r.sizeX + '×' + r.sizeY + '×' + r.sizeZ + '</b></span>';
-    html += '<span class="req-formula">' + r.kind + ' · every shape exports as a real schematic</span>';
+    html += '<span class="req-formula">' + escapeHtml(r.kind) + ' · every shape exports as a real schematic</span>';
   }
   reqBody.innerHTML = html;
   reqShow();
@@ -2168,19 +2193,36 @@ function decodeParams(tab, s) {
   var out = Object.assign({}, def);
   var parts = s.split('.');
   var order = FIELD_ORDER[tab];
+  var bounds = CTL_BOUNDS[tab] || {};
+  var decodeNumber = function (raw, k, scale, integer) {
+    var n = Number(raw) / scale;
+    if (!isFinite(n)) return def[k];
+    var b = bounds[k] || (k === 'inclusionPct' ? { min: 0, max: 100, integer: true } : null);
+    if (b) {
+      if (n < b.min) n = b.min;
+      if (n > b.max) n = b.max;
+      if (b.integer || integer) n = Math.round(n);
+    } else if (integer) {
+      n = Math.round(n);
+    }
+    return n;
+  };
   for (var i = 0; i < order.length && i < parts.length; i++) {
     var raw = parts[i];
     if (raw === '') continue;
     var k = order[i], t = types[k];
     if (t === 'b') out[k] = raw === '1';
-    else if (t === 'f') out[k] = parseFloat(raw) / 100;
-    else if (t === 'g') out[k] = parseFloat(raw) / 1000;
-    else if (t === 'i') out[k] = parseInt(raw, 10);
+    else if (t === 'f') out[k] = decodeNumber(raw, k, 100, false);
+    else if (t === 'g') out[k] = decodeNumber(raw, k, 1000, false);
+    else if (t === 'i') out[k] = decodeNumber(raw, k, 1, true);
     else if (t === 'j') {
       out[k] = raw ? raw.split(',').map(function (e) {
         var mm = e.split(':');
-        return { material: mm[0] || 'sea_lantern', pct: parseInt(mm[1] || '0', 10) || 0 };
-      }) : null;
+        var material = INC_MATS.indexOf(mm[0]) >= 0 ? mm[0] : 'sea_lantern';
+        var pct = Number(mm[1]);
+        if (!isFinite(pct)) pct = 0;
+        return { material: material, pct: Math.round(Math.min(100, Math.max(0, pct))) };
+      }).filter(function (e) { return e.material; }) : null;
     }
     else {
       var map = ENUM_DECODE[k];
@@ -2279,18 +2321,18 @@ function buildLabPanel() {
 }
 function labAnalyze(file) {
   var out = document.getElementById('lab-out');
-  out.innerHTML = '<p>Reading ' + file.name + '…</p>';
+  out.innerHTML = '<p>Reading ' + escapeHtml(file.name) + '…</p>';
   file.arrayBuffer().then(function (ab) {
     return Gen.analyzeSchematic(new Uint8Array(ab));
   }).then(function (r) {
-    if (!r.ok) { out.innerHTML = '<p class="warn">✘ ' + (r.error || 'unreadable file') + '</p>'; return; }
+    if (!r.ok) { out.innerHTML = '<p class="warn">✘ ' + escapeHtml(r.error || 'unreadable file') + '</p>'; return; }
     renderLab(r, file.name);
   }).catch(function (err) {
-    out.innerHTML = '<p class="warn">✘ ' + (err && err.message ? err.message : err) + '</p>';
+    out.innerHTML = '<p class="warn">✘ ' + escapeHtml(err && err.message ? err.message : err) + '</p>';
   });
 }
 function renderLab(r, name) {
-  var html = '<h3>' + name + (r.gzipped ? ' (gzipped)' : '') + ' — ' + r.total.toLocaleString() + ' blocks, ' + r.size.x + '×' + r.size.y + '×' + r.size.z + '</h3>';
+  var html = '<h3>' + escapeHtml(name) + (r.gzipped ? ' (gzipped)' : '') + ' — ' + r.total.toLocaleString() + ' blocks, ' + r.size.x + '×' + r.size.y + '×' + r.size.z + '</h3>';
   var aeroBits = [];
   if (r.aero.envelope) aeroBits.push(r.aero.envelope + '× envelope');
   if (r.aero.burner) aeroBits.push(r.aero.burner + '× adjustable burner');
@@ -2309,12 +2351,12 @@ function renderLab(r, name) {
   }
   html += '<table><tr><th>Block</th><th class="num">Count</th></tr>';
   for (var i = 0; i < r.palette.length; i++) {
-    html += '<tr><td><code>' + r.palette[i].name + '</code></td><td class="num">' + r.palette[i].count.toLocaleString() + '</td></tr>';
+    html += '<tr><td><code>' + escapeHtml(r.palette[i].name) + '</code></td><td class="num">' + r.palette[i].count.toLocaleString() + '</td></tr>';
   }
   html += '</table>';
   html += '<h3>Mass &amp; size</h3><p>Est. craft mass: <b>' + r.mass.toLocaleString() + '</b> mass units (' + r.total.toLocaleString() + ' blocks × ' + r.blockMass + ' + payload ' + r.payload + ') · occupied bbox ' + r.size.x + '×' + r.size.y + '×' + r.size.z + '</p>';
   var nsBits = [];
-  for (var k in r.namespaces) nsBits.push(k + ': ' + r.namespaces[k]);
+  for (var k in r.namespaces) nsBits.push(escapeHtml(k) + ': ' + r.namespaces[k]);
   html += '<h3>Namespaces</h3><p>' + nsBits.join(' · ') + '</p>';
   html += '<h3>Center of mass</h3><p>COM ' + r.com.x.toFixed(1) + ', ' + r.com.y.toFixed(1) + ', ' + r.com.z.toFixed(1) +
     ' · middle ' + r.center.x.toFixed(1) + ', ' + r.center.y.toFixed(1) + ', ' + r.center.z.toFixed(1) +
@@ -2534,7 +2576,7 @@ function openGuide() {
     if (seen[key]) continue;
     seen[key] = 1;
     var sw = document.createElement('span');
-    sw.innerHTML = '<i style="background:' + blockColorHex(tp, p) + '"></i> ' + guideLabel(key);
+    sw.innerHTML = '<i style="background:' + blockColorHex(tp, p) + '"></i> ' + escapeHtml(guideLabel(key));
     legend.appendChild(sw);
   }
   if (isBalloonTab()) {

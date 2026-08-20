@@ -48,6 +48,79 @@
     g.arr[g.n++] = v;
   }
 
+  /* ---- shared voxel-grid utilities ----
+     Every module works on a flat Uint8Array grid indexed (x * Y + y) * Z + z.
+     These helpers own the index decode, the 6-neighbor walk (always in
+     -x, +x, -y, +y, -z, +z order — flood fills and peels depend on it)
+     and the surface test. */
+
+  /* visit the (bounds-checked) 6 face-neighbors of cell i */
+  function forEachNbr6(i, X, Y, Z, visit) {
+    var YZ = Y * Z;
+    var x = (i / YZ) | 0, rem = i - x * YZ, y = (rem / Z) | 0, z = rem - y * Z;
+    if (x > 0) visit(i - YZ);
+    if (x < X - 1) visit(i + YZ);
+    if (y > 0) visit(i - Z);
+    if (y < Y - 1) visit(i + Z);
+    if (z > 0) visit(i - 1);
+    if (z < Z - 1) visit(i + 1);
+  }
+
+  /* true when cell i sits on the grid border or has an empty face-neighbor */
+  function touchesAir(grid, i, X, Y, Z) {
+    var YZ = Y * Z;
+    var x = (i / YZ) | 0, rem = i - x * YZ, y = (rem / Z) | 0, z = rem - y * Z;
+    return x === 0 || x === X - 1 || y === 0 || y === Y - 1 || z === 0 || z === Z - 1 ||
+      !grid[i - YZ] || !grid[i + YZ] || !grid[i - Z] || !grid[i + Z] || !grid[i - 1] || !grid[i + 1];
+  }
+
+  /* min/max bounds of a packed [x,y,z, x,y,z, ...] triple list */
+  function boundsOfTriples(arr, n) {
+    var minX = 1e9, minY = 1e9, minZ = 1e9, maxX = -1e9, maxY = -1e9, maxZ = -1e9;
+    for (var i = 0; i < n; i++) {
+      var x = arr[i * 3], y = arr[i * 3 + 1], z = arr[i * 3 + 2];
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    }
+    return { minX: minX, minY: minY, minZ: minZ, maxX: maxX, maxY: maxY, maxZ: maxZ };
+  }
+
+  /* emit a packed point list as origin-shifted typed arrays, one material */
+  function emitPoints(pts, mat) {
+    var n = pts.length / 3;
+    var b = boundsOfTriples(pts, n);
+    var positions = new Int16Array(n * 3), types = new Uint8Array(n);
+    for (var i = 0; i < n; i++) {
+      positions[i * 3] = pts[i * 3] - b.minX;
+      positions[i * 3 + 1] = pts[i * 3 + 1] - b.minY;
+      positions[i * 3 + 2] = pts[i * 3 + 2] - b.minZ;
+      types[i] = mat;
+    }
+    return {
+      positions: positions, types: types, count: n,
+      minX: b.minX, minY: b.minY, minZ: b.minZ,
+      maxX: b.maxX, maxY: b.maxY, maxZ: b.maxZ
+    };
+  }
+
+  /* pack every solid grid cell into Int16 triples via write(out, k, x, y, z) */
+  function solidPositionsOf(grid, solid, Y, Z, write) {
+    var out = new Int16Array(solid * 3), si = 0, YZ = Y * Z;
+    for (var i = 0; i < grid.length && si < solid; i++) {
+      if (!grid[i]) continue;
+      var x = (i / YZ) | 0, rem = i - x * YZ, y = (rem / Z) | 0, z = rem - y * Z;
+      write(out, si * 3, x, y, z);
+      si++;
+    }
+    return out;
+  }
+
+  /* middle of an inclusive block bounding box, in cell-center coords */
+  function middleOf(minX, minY, minZ, maxX, maxY, maxZ) {
+    return { x: (minX + maxX + 1) / 2, y: (minY + maxY + 1) / 2, z: (minZ + maxZ + 1) / 2 };
+  }
+
   function genBalloon(p) {
     p = p || {};
     var L = clamp(Math.round(p.lengthX || 12), 6, 500);
@@ -156,31 +229,29 @@
     var interior = 0, solidCovered = 0;
     var outCells = growable(1024);
 
+    /* claim a solid, unbuilt cell as WOOL structure */
+    var next = null;
+    var claim = function (n) {
+      if (grid[n] && !taken[n]) {
+        taken[n] = 1; outType[n] = WOOL;
+        if (next) push(next, n);
+        push(outCells, n);
+      }
+    };
+
     if (hollow) {
       /* peel shell layers from the surface inward */
       var frontier = growable(1024);
-      var gy = GY, gz = GZ;
       for (var i = 0; i < grid.length; i++) {
         if (!grid[i]) continue;
-        var xi = (i / (gy * gz)) | 0, rem = i - xi * gy * gz, yi = (rem / gz) | 0, zi = rem - yi * gz;
-        var surf = (xi === 0) || (xi === X - 1) || (yi === 0) || (yi === GY - 1) || (zi === 0) || (zi === GZ - 1) ||
-          !grid[i - gy * gz] || !grid[i + gy * gz] || !grid[i - gz] || !grid[i + gz] || !grid[i - 1] || !grid[i + 1];
-        if (surf) { taken[i] = 1; outType[i] = WOOL; push(frontier, i); push(outCells, i); }
+        if (touchesAir(grid, i, X, GY, GZ)) { taken[i] = 1; outType[i] = WOOL; push(frontier, i); push(outCells, i); }
       }
       for (var k = 2; k <= shellK; k++) {
-        var next = growable(frontier.n);
-        for (var f = 0; f < frontier.n; f++) {
-          var ci = frontier.arr[f];
-          var cx = (ci / (gy * gz)) | 0, crem = ci - cx * gy * gz, cy = (crem / gz) | 0, cz = crem - cy * gz;
-          if (cx > 0) { var n1 = ci - gy * gz; if (grid[n1] && !taken[n1]) { taken[n1] = 1; outType[n1] = WOOL; push(next, n1); push(outCells, n1); } }
-          if (cx < X - 1) { var n2 = ci + gy * gz; if (grid[n2] && !taken[n2]) { taken[n2] = 1; outType[n2] = WOOL; push(next, n2); push(outCells, n2); } }
-          if (cy > 0) { var n3 = ci - gz; if (grid[n3] && !taken[n3]) { taken[n3] = 1; outType[n3] = WOOL; push(next, n3); push(outCells, n3); } }
-          if (cy < GY - 1) { var n4 = ci + gz; if (grid[n4] && !taken[n4]) { taken[n4] = 1; outType[n4] = WOOL; push(next, n4); push(outCells, n4); } }
-          if (cz > 0) { var n5 = ci - 1; if (grid[n5] && !taken[n5]) { taken[n5] = 1; outType[n5] = WOOL; push(next, n5); push(outCells, n5); } }
-          if (cz < GZ - 1) { var n6 = ci + 1; if (grid[n6] && !taken[n6]) { taken[n6] = 1; outType[n6] = WOOL; push(next, n6); push(outCells, n6); } }
-        }
+        next = growable(frontier.n);
+        for (var f = 0; f < frontier.n; f++) forEachNbr6(frontier.arr[f], X, GY, GZ, claim);
         frontier = next;
       }
+      next = null;
     } else {
       /* solid balloon: everything is output */
       for (var i2 = 0; i2 < grid.length; i2++) {
@@ -200,17 +271,16 @@
       }
       for (var qq = 0; qq < ribCells.length; qq++) {
         var ri = ribCells[qq];
-        var rx = (ri / (GY * GZ)) | 0;
         outType[ri] = LOG;
-        var rrem = ri - rx * GY * GZ, ry = (rrem / GZ) | 0, rz = rrem - ry * GZ;
-        if (rx > 0) { var v1 = ri - GY * GZ; if (grid[v1] && !taken[v1]) { taken[v1] = 1; outType[v1] = WOOL; push(outCells, v1); } }
-        if (rx < X - 1) { var v2 = ri + GY * GZ; if (grid[v2] && !taken[v2]) { taken[v2] = 1; outType[v2] = WOOL; push(outCells, v2); } }
-        if (ry > 0) { var v3 = ri - GZ; if (grid[v3] && !taken[v3]) { taken[v3] = 1; outType[v3] = WOOL; push(outCells, v3); } }
-        if (ry < GY - 1) { var v4 = ri + GZ; if (grid[v4] && !taken[v4]) { taken[v4] = 1; outType[v4] = WOOL; push(outCells, v4); } }
-        if (rz > 0) { var v5 = ri - 1; if (grid[v5] && !taken[v5]) { taken[v5] = 1; outType[v5] = WOOL; push(outCells, v5); } }
-        if (rz < GZ - 1) { var v6 = ri + 1; if (grid[v6] && !taken[v6]) { taken[v6] = 1; outType[v6] = WOOL; push(outCells, v6); } }
+        forEachNbr6(ri, X, GY, GZ, claim);
       }
     }
+
+    /* stamp an attachment cell: overwrite the type if already built, else add it */
+    var stamp = function (c, tp) {
+      if (taken[c]) { outType[c] = tp; }
+      else { taken[c] = 1; outType[c] = tp; push(outCells, c); }
+    };
 
     /* keel: LOG column below the lowest shell cell at the center z, for each x */
     if (keelOn) {
@@ -221,11 +291,7 @@
           if (taken[idx(x3, y3, zC)]) { U = y3; break; }
         }
         if (U >= 0) {
-          for (var w = 1; w <= keelD; w++) {
-            var kc = idx(x3, U - w, zC);
-            if (taken[kc]) { outType[kc] = LOG; }          /* overwrite type if already built */
-            else { taken[kc] = 1; outType[kc] = LOG; push(outCells, kc); }
-          }
+          for (var w = 1; w <= keelD; w++) stamp(idx(x3, U - w, zC), LOG);
         }
       }
     }
@@ -242,18 +308,13 @@
           if (taken[idx(x4, y4, zC2)]) { top = y4; break; }
         }
         if (top >= 0) {
-          for (var r2 = 1; r2 <= topH; r2++) {
-            var fc = idx(x4, top + r2, zC2);
-            if (taken[fc]) { outType[fc] = PLANK; }
-            else { taken[fc] = 1; outType[fc] = PLANK; push(outCells, fc); }
-          }
+          for (var r2 = 1; r2 <= topH; r2++) stamp(idx(x4, top + r2, zC2), PLANK);
         }
         var sideH = Math.ceil(finH * .7 * (1 - prog));
         if (taken[idx(x4, yV, zC2)]) {
           for (var k2 = 1; k2 <= sideH; k2++) {
-            var c1 = idx(x4, yV, zC2 - k2), c2 = idx(x4, yV, zC2 + k2);
-            if (taken[c1]) { outType[c1] = PLANK; } else { taken[c1] = 1; outType[c1] = PLANK; push(outCells, c1); }
-            if (taken[c2]) { outType[c2] = PLANK; } else { taken[c2] = 1; outType[c2] = PLANK; push(outCells, c2); }
+            stamp(idx(x4, yV, zC2 - k2), PLANK);
+            stamp(idx(x4, yV, zC2 + k2), PLANK);
           }
         }
       }
@@ -272,9 +333,8 @@
         }
         if (mn >= 0) {
           for (var xw2 = 1; xw2 <= xw; xw2++) {
-            var f1 = idx(x5, yH, mn - xw2), f2 = idx(x5, yH, mx + xw2);
-            if (taken[f1]) { outType[f1] = PLANK; } else { taken[f1] = 1; outType[f1] = PLANK; push(outCells, f1); }
-            if (taken[f2]) { outType[f2] = PLANK; } else { taken[f2] = 1; outType[f2] = PLANK; push(outCells, f2); }
+            stamp(idx(x5, yH, mn - xw2), PLANK);
+            stamp(idx(x5, yH, mx + xw2), PLANK);
           }
         }
       }
@@ -287,10 +347,7 @@
       var pruned = growable(outCells.n);
       for (var p0 = 0; p0 < outCells.n; p0++) {
         var pc = outCells.arr[p0];
-        var px = (pc / (GY * GZ)) | 0, prem = pc - px * GY * GZ, py = (prem / GZ) | 0, pz = prem - py * GZ;
-        var touchesAir = px === 0 || px === X - 1 || py === 0 || py === GY - 1 || pz === 0 || pz === GZ - 1 ||
-          !grid[pc - GY * GZ] || !grid[pc + GY * GZ] || !grid[pc - GZ] || !grid[pc + GZ] || !grid[pc - 1] || !grid[pc + 1];
-        if (touchesAir) push(pruned, pc);
+        if (touchesAir(grid, pc, X, GY, GZ)) push(pruned, pc);
       }
       outCells = pruned;
     }
@@ -330,16 +387,9 @@
        in the same coordinate frame as the structure output */
     var solidPositions = null;
     if (p.includeSolid && solid <= 2000000) {
-      solidPositions = new Int16Array(solid * 3);
-      var si = 0;
-      for (var gi = 0; gi < grid.length && si < solid; gi++) {
-        if (!grid[gi]) continue;
-        var gx = (gi / (GY * GZ)) | 0, grm = gi - gx * GY * GZ, gy = (grm / GZ) | 0, gz = grm - gy * GZ;
-        solidPositions[si * 3] = gx;
-        solidPositions[si * 3 + 1] = gy + yShift;
-        solidPositions[si * 3 + 2] = gz - zB;
-        si++;
-      }
+      solidPositions = solidPositionsOf(grid, solid, GY, GZ, function (out, k, gx, gy, gz) {
+        out[k] = gx; out[k + 1] = gy + yShift; out[k + 2] = gz - zB;
+      });
     }
 
     return {
@@ -408,30 +458,17 @@
       if (hubIdx === -1) pts.push(0, 0, 0);
     }
 
-    var n = pts.length / 3;
-    var minX = 1e9, minY = 1e9, minZ = 1e9, maxX = -1, maxY = -1, maxZ = -1;
-    for (var e = 0; e < n; e++) {
-      var px = pts[e * 3], py = pts[e * 3 + 1], pz = pts[e * 3 + 2];
-      if (px < minX) minX = px; if (px > maxX) maxX = px;
-      if (py < minY) minY = py; if (py > maxY) maxY = py;
-      if (pz < minZ) minZ = pz; if (pz > maxZ) maxZ = pz;
-    }
-    var positions = new Int16Array(n * 3), types = new Uint8Array(n);
-    for (var e2 = 0; e2 < n; e2++) {
-      positions[e2 * 3] = pts[e2 * 3] - minX;
-      positions[e2 * 3 + 1] = pts[e2 * 3 + 1] - minY;
-      positions[e2 * 3 + 2] = pts[e2 * 3 + 2] - minZ;
-      types[e2] = mat;
-    }
+    var mm = emitPoints(pts, mat);
+    var n = mm.count;
     return {
-      positions: positions,
-      types: types,
+      positions: mm.positions,
+      types: mm.types,
       count: n,
       interior: 0, solid: n,
       wool: mat === WOOL ? n : 0, logs: 0, planks: 0,
       minX: 0, minY: 0, minZ: 0,
-      maxX: maxX - minX, maxY: maxY - minY, maxZ: maxZ - minZ,
-      center: [-minX, -minY, -minZ],   /* the single hub block, in shifted coords */
+      maxX: mm.maxX - mm.minX, maxY: mm.maxY - mm.minY, maxZ: mm.maxZ - mm.minZ,
+      center: [-mm.minX, -mm.minY, -mm.minZ],   /* the single hub block, in shifted coords */
       hollow: false
     };
   }
@@ -467,26 +504,13 @@
         if (mirror) add(x, -z);
       }
     }
-    var n = pts.length / 3;
-    var minX = 1e9, minY = 1e9, minZ = 1e9, maxX = -1, maxY = -1, maxZ = -1;
-    for (var e = 0; e < n; e++) {
-      var px = pts[e * 3], py = pts[e * 3 + 1], pz = pts[e * 3 + 2];
-      if (px < minX) minX = px; if (px > maxX) maxX = px;
-      if (py < minY) minY = py; if (py > maxY) maxY = py;
-      if (pz < minZ) minZ = pz; if (pz > maxZ) maxZ = pz;
-    }
-    var positions = new Int16Array(n * 3), types = new Uint8Array(n), props = new Uint8Array(n);
-    for (var e2 = 0; e2 < n; e2++) {
-      positions[e2 * 3] = pts[e2 * 3] - minX;
-      positions[e2 * 3 + 1] = pts[e2 * 3 + 1] - minY;
-      positions[e2 * 3 + 2] = pts[e2 * 3 + 2] - minZ;
-      types[e2] = WING;
-    }
+    var mm = emitPoints(pts, WING);
+    var n = mm.count;
     return {
-      positions: positions, types: types, props: props, count: n,
+      positions: mm.positions, types: mm.types, props: new Uint8Array(n), count: n,
       interior: 0, solid: n, solidPositions: null,
       wool: 0, logs: 0, planks: 0,
-      minX: 0, minY: 0, minZ: 0, maxX: maxX - minX, maxY: maxY - minY, maxZ: maxZ - minZ,
+      minX: 0, minY: 0, minZ: 0, maxX: mm.maxX - mm.minX, maxY: mm.maxY - mm.minY, maxZ: mm.maxZ - mm.minZ,
       hollow: false,
       span: span, area: n, wingBlock: p.wingBlock || 'copycat_wing'
     };
@@ -533,26 +557,17 @@
     var hull = new Uint8Array(total);
     var hullCount = 0;
     var frontier = [];
-    var YZ = Y * Z;
     for (var i = 0; i < total; i++) {
       if (!grid[i]) continue;
-      var xi = (i / YZ) | 0, rem = i - xi * YZ, yi = (rem / Z) | 0, zi = rem - yi * Z;
-      var surf = xi === 0 || xi === X - 1 || yi === 0 || yi === Y - 1 || zi === 0 || zi === Z - 1 ||
-        !grid[i - YZ] || !grid[i + YZ] || !grid[i - Z] || !grid[i + Z] || !grid[i - 1] || !grid[i + 1];
-      if (surf) { hull[i] = 1; hullCount++; frontier.push(i); }
+      if (touchesAir(grid, i, X, Y, Z)) { hull[i] = 1; hullCount++; frontier.push(i); }
     }
+    var next;
+    var claim = function (n) {
+      if (grid[n] && !hull[n]) { hull[n] = 1; hullCount++; next.push(n); }
+    };
     for (var layer = 2; layer <= k; layer++) {
-      var next = [];
-      for (var f = 0; f < frontier.length; f++) {
-        var ci = frontier[f];
-        var cx = (ci / YZ) | 0, crem = ci - cx * YZ, cy = (crem / Z) | 0, cz = crem - cy * Z;
-        if (cx > 0) { var n1 = ci - YZ; if (grid[n1] && !hull[n1]) { hull[n1] = 1; hullCount++; next.push(n1); } }
-        if (cx < X - 1) { var n2 = ci + YZ; if (grid[n2] && !hull[n2]) { hull[n2] = 1; hullCount++; next.push(n2); } }
-        if (cy > 0) { var n3 = ci - Z; if (grid[n3] && !hull[n3]) { hull[n3] = 1; hullCount++; next.push(n3); } }
-        if (cy < Y - 1) { var n4 = ci + Z; if (grid[n4] && !hull[n4]) { hull[n4] = 1; hullCount++; next.push(n4); } }
-        if (cz > 0) { var n5 = ci - 1; if (grid[n5] && !hull[n5]) { hull[n5] = 1; hullCount++; next.push(n5); } }
-        if (cz < Z - 1) { var n6 = ci + 1; if (grid[n6] && !hull[n6]) { hull[n6] = 1; hullCount++; next.push(n6); } }
-      }
+      next = [];
+      for (var f = 0; f < frontier.length; f++) forEachNbr6(frontier[f], X, Y, Z, claim);
       frontier = next;
     }
     return { hull: hull, count: hullCount };
@@ -569,21 +584,7 @@
     for (var x = 0; x < X; x++) for (var y = 0; y < Y; y++) { seed(x * YZ + y * Z); seed(x * YZ + y * Z + Z - 1); }
     for (var y = 0; y < Y; y++) for (var z = 0; z < Z; z++) { seed(y * Z + z); seed((X - 1) * YZ + y * Z + z); }
     for (var x = 0; x < X; x++) for (var z = 0; z < Z; z++) { seed(x * YZ + z); seed(x * YZ + (Y - 1) * Z + z); }
-    while (stack.length) {
-      var i = stack.pop();
-      var xi = (i / YZ) | 0, rem = i - xi * YZ, yi = (rem / Z) | 0, zi = rem - yi * Z;
-      var nbs = [];
-      if (xi > 0) nbs.push(i - YZ);
-      if (xi < X - 1) nbs.push(i + YZ);
-      if (yi > 0) nbs.push(i - Z);
-      if (yi < Y - 1) nbs.push(i + Z);
-      if (zi > 0) nbs.push(i - 1);
-      if (zi < Z - 1) nbs.push(i + 1);
-      for (var n2 = 0; n2 < nbs.length; n2++) {
-        var j = nbs[n2];
-        if (!grid[j] && !lab[j]) { lab[j] = 1; stack.push(j); }
-      }
-    }
+    while (stack.length) forEachNbr6(stack.pop(), X, Y, Z, seed);
     for (var k2 = 0; k2 < total; k2++) if (!grid[k2] && !lab[k2]) lab[k2] = 2;
     return lab;
   }
@@ -726,23 +727,16 @@
     var depthFrontier = [];
     for (var s2 = 0; s2 < total; s2++) {
       if (!grid[s2]) continue;
-      var sx3 = (s2 / (Y * Z)) | 0, srm3 = s2 - sx3 * Y * Z, sy3 = (srm3 / Z) | 0, sz3 = srm3 - sy3 * Z;
-      var onSurf = (sx3 === 0 || sx3 === X - 1 || sy3 === 0 || sy3 === Y - 1 || sz3 === 0 || sz3 === Z - 1) ||
-        !grid[s2 - Y * Z] || !grid[s2 + Y * Z] || !grid[s2 - Z] || !grid[s2 + Z] || !grid[s2 - 1] || !grid[s2 + 1];
-      if (onSurf) { surfCells.push(s2); surfDepth[s2] = 1; depthFrontier.push(s2); }
+      if (touchesAir(grid, s2, X, Y, Z)) { surfCells.push(s2); surfDepth[s2] = 1; depthFrontier.push(s2); }
     }
+    var nextFrontier, curDepth;
+    var deepen = function (n) {
+      if (grid[n] && !surfDepth[n]) { surfDepth[n] = curDepth; nextFrontier.push(n); }
+    };
     for (var depth = 2; depth <= crackDepth; depth++) {
-      var nextFrontier = [];
-      for (var df = 0; df < depthFrontier.length; df++) {
-        var d0 = depthFrontier[df];
-        var dx0 = (d0 / (Y * Z)) | 0, drm = d0 - dx0 * Y * Z, dy0 = (drm / Z) | 0, dz0 = drm - dy0 * Z;
-        if (dx0 > 0) { var dn1 = d0 - Y * Z; if (grid[dn1] && !surfDepth[dn1]) { surfDepth[dn1] = depth; nextFrontier.push(dn1); } }
-        if (dx0 < X - 1) { var dn2 = d0 + Y * Z; if (grid[dn2] && !surfDepth[dn2]) { surfDepth[dn2] = depth; nextFrontier.push(dn2); } }
-        if (dy0 > 0) { var dn3 = d0 - Z; if (grid[dn3] && !surfDepth[dn3]) { surfDepth[dn3] = depth; nextFrontier.push(dn3); } }
-        if (dy0 < Y - 1) { var dn4 = d0 + Z; if (grid[dn4] && !surfDepth[dn4]) { surfDepth[dn4] = depth; nextFrontier.push(dn4); } }
-        if (dz0 > 0) { var dn5 = d0 - 1; if (grid[dn5] && !surfDepth[dn5]) { surfDepth[dn5] = depth; nextFrontier.push(dn5); } }
-        if (dz0 < Z - 1) { var dn6 = d0 + 1; if (grid[dn6] && !surfDepth[dn6]) { surfDepth[dn6] = depth; nextFrontier.push(dn6); } }
-      }
+      nextFrontier = [];
+      curDepth = depth;
+      for (var df = 0; df < depthFrontier.length; df++) forEachNbr6(depthFrontier[df], X, Y, Z, deepen);
       depthFrontier = nextFrontier;
     }
     var crackOrigins = [];
@@ -854,19 +848,10 @@
           var ra = find(a), rb = find(b);
           if (ra !== rb) parent[ra] = rb;
         };
+        var unionNbr = function (n) { if (hullSet[n]) union(cc0, n); };
         for (var hc2b = 0; hc2b < hullCells.length; hc2b++) {
           var cc0 = hullCells[hc2b];
-          var cx6 = (cc0 / (Y * Z)) | 0, crm6 = cc0 - cx6 * Y * Z, cy6 = (crm6 / Z) | 0, cz6 = crm6 - cy6 * Z;
-          var cnbs6 = [];
-          if (cx6 > 0) cnbs6.push(cc0 - Y * Z);
-          if (cx6 < X - 1) cnbs6.push(cc0 + Y * Z);
-          if (cy6 > 0) cnbs6.push(cc0 - Z);
-          if (cy6 < Y - 1) cnbs6.push(cc0 + Z);
-          if (cz6 > 0) cnbs6.push(cc0 - 1);
-          if (cz6 < Z - 1) cnbs6.push(cc0 + 1);
-          for (var cn6 = 0; cn6 < cnbs6.length; cn6++) {
-            if (hullSet[cnbs6[cn6]]) union(cc0, cnbs6[cn6]);
-          }
+          forEachNbr6(cc0, X, Y, Z, unionNbr);
         }
         /* bridge diagonal junctions between different pieces: one bridge per
            merge (a spanning set, not a full closure) — prefer open-air cells
@@ -938,27 +923,17 @@
       var filled = 0;
       var coreId = new Int32Array(total);
       var coreSizes = [];
+      var cid, cstack;
+      var growCore = function (n) {
+        if (grid[n] && !hullSet[n] && !coreId[n]) { coreId[n] = cid; cstack.push(n); }
+      };
       for (var q3 = 0; q3 < total; q3++) {
         if (!grid[q3] || hullSet[q3] || coreId[q3]) continue;
-        var cid = coreSizes.length + 1;
-        var cstack = [q3];
+        cid = coreSizes.length + 1;
+        cstack = [q3];
         coreId[q3] = cid;
         var csz = 0;
-        while (cstack.length) {
-          var cc2 = cstack.pop(); csz++;
-          var cx4 = (cc2 / (Y * Z)) | 0, crm4 = cc2 - cx4 * Y * Z, cy4 = (crm4 / Z) | 0, cz4 = crm4 - cy4 * Z;
-          var cnbs = [];
-          if (cx4 > 0) cnbs.push(cc2 - Y * Z);
-          if (cx4 < X - 1) cnbs.push(cc2 + Y * Z);
-          if (cy4 > 0) cnbs.push(cc2 - Z);
-          if (cy4 < Y - 1) cnbs.push(cc2 + Z);
-          if (cz4 > 0) cnbs.push(cc2 - 1);
-          if (cz4 < Z - 1) cnbs.push(cc2 + 1);
-          for (var cn = 0; cn < cnbs.length; cn++) {
-            var cnb = cnbs[cn];
-            if (grid[cnb] && !hullSet[cnb] && !coreId[cnb]) { coreId[cnb] = cid; cstack.push(cnb); }
-          }
-        }
+        while (cstack.length) { csz++; forEachNbr6(cstack.pop(), X, Y, Z, growCore); }
         coreSizes.push(csz);
       }
       var mainCore = 0, mainCoreSize = 0;
@@ -981,28 +956,18 @@
     var dropChips = function () {
       var compLab2 = new Int32Array(total);
       var compSizes2 = [];
+      var cid2, fstack2;
+      var growComp = function (n) {
+        if (hullSet[n] && !compLab2[n]) { compLab2[n] = cid2; fstack2.push(n); }
+      };
       for (var fc3 = 0; fc3 < hullCells.length; fc3++) {
         var fc4 = hullCells[fc3];
         if (compLab2[fc4]) continue;
-        var cid2 = compSizes2.length + 1;
-        var fstack2 = [fc4];
+        cid2 = compSizes2.length + 1;
+        fstack2 = [fc4];
         compLab2[fc4] = cid2;
         var csz2 = 0;
-        while (fstack2.length) {
-          var fc5 = fstack2.pop(); csz2++;
-          var fx2 = (fc5 / (Y * Z)) | 0, frm2 = fc5 - fx2 * Y * Z, fy2 = (frm2 / Z) | 0, fz2 = frm2 - fy2 * Z;
-          var fnbs2 = [];
-          if (fx2 > 0) fnbs2.push(fc5 - Y * Z);
-          if (fx2 < X - 1) fnbs2.push(fc5 + Y * Z);
-          if (fy2 > 0) fnbs2.push(fc5 - Z);
-          if (fy2 < Y - 1) fnbs2.push(fc5 + Z);
-          if (fz2 > 0) fnbs2.push(fc5 - 1);
-          if (fz2 < Z - 1) fnbs2.push(fc5 + 1);
-          for (var fn2 = 0; fn2 < fnbs2.length; fn2++) {
-            var fnb2 = fnbs2[fn2];
-            if (hullSet[fnb2] && !compLab2[fnb2]) { compLab2[fnb2] = cid2; fstack2.push(fnb2); }
-          }
-        }
+        while (fstack2.length) { csz2++; forEachNbr6(fstack2.pop(), X, Y, Z, growComp); }
         compSizes2.push(csz2);
       }
       var mainId2 = 0, mainSize2 = 0;
@@ -1063,6 +1028,8 @@
       variants.push({ material: p.inclusionMaterial || 'sea_lantern', pct: inclusionPct, count: 0 });
     }
     var inclusionTotal = 0;
+    var opts = [];
+    var pushOpt = function (n) { opts.push(n); };
     for (var vi = 0; vi < variants.length; vi++) {
       var vt = variants[vi];
       var vtTarget = legacyInc >= 0 ? -1 : Math.round(vt.pct / 100 * hullCount);
@@ -1084,14 +1051,8 @@
           seen[q] = 1;
           cellType[q] = 2 + vi;
           placedNow++;
-          var qx = (q / (Y * Z)) | 0, qrm = q - qx * Y * Z, qy = (qrm / Z) | 0, qz = qrm - qy * Z;
-          var opts = [];
-          if (qx > 0) opts.push(q - Y * Z);
-          if (qx < X - 1) opts.push(q + Y * Z);
-          if (qy > 0) opts.push(q - Z);
-          if (qy < Y - 1) opts.push(q + Z);
-          if (qz > 0) opts.push(q - 1);
-          if (qz < Z - 1) opts.push(q + 1);
+          opts.length = 0;
+          forEachNbr6(q, X, Y, Z, pushOpt);
           while (opts.length) queue.push(opts.splice(Math.floor(rand() * opts.length), 1)[0]);
         }
         placed += placedNow;
@@ -1119,13 +1080,8 @@
       else { types[ci] = CRYSTAL; crystalCount++; }
       ci++;
     }
-    var minX = 1e9, minY = 1e9, minZ = 1e9, maxX = -1e9, maxY = -1e9, maxZ = -1e9;
-    for (var e = 0; e < nCells; e++) {
-      var px3 = positions[e * 3], py3 = positions[e * 3 + 1], pz3 = positions[e * 3 + 2];
-      if (px3 < minX) minX = px3; if (px3 > maxX) maxX = px3;
-      if (py3 < minY) minY = py3; if (py3 > maxY) maxY = py3;
-      if (pz3 < minZ) minZ = pz3; if (pz3 > maxZ) maxZ = pz3;
-    }
+    var bb = boundsOfTriples(positions, nCells);
+    var minX = bb.minX, minY = bb.minY, minZ = bb.minZ, maxX = bb.maxX, maxY = bb.maxY, maxZ = bb.maxZ;
     var yShift = -minY;   /* sit on the grid in either orientation */
     if (yShift) for (var e2 = 0; e2 < nCells; e2++) positions[e2 * 3 + 1] += yShift;
     minY += yShift; maxY += yShift;
@@ -1142,16 +1098,11 @@
 
     var solidPositions = null;
     if (p.includeSolid && solid <= 2000000) {
-      solidPositions = new Int16Array(solid * 3);
-      var si = 0;
-      for (var gi2 = 0; gi2 < total && si < solid; gi2++) {
-        if (!grid[gi2]) continue;
-        var gx2 = (gi2 / (Y * Z)) | 0, grm2 = gi2 - gx2 * Y * Z, gy2 = (grm2 / Z) | 0, gz2 = grm2 - gy2 * Z;
-        solidPositions[si * 3] = lying ? gy2 : gx2;
-        solidPositions[si * 3 + 1] = (lying ? gx2 : gy2) + yShift;
-        solidPositions[si * 3 + 2] = gz2;
-        si++;
-      }
+      solidPositions = solidPositionsOf(grid, solid, Y, Z, function (out, k, gx, gy, gz) {
+        out[k] = lying ? gy : gx;
+        out[k + 1] = (lying ? gx : gy) + yShift;
+        out[k + 2] = gz;
+      });
     }
 
     /* ponder-style build steps */
@@ -1169,9 +1120,8 @@
     }
     steps = steps.filter(function (s) { return s.blocks.length > 0; });
 
-    var burners = interior > 0 ? Math.max(1, Math.ceil(interior / 500)) : 0;
-    var lift = interior * 1.5;
-    var mass = (nCells + burners) * blockMass + payload;
+    var fm = mathFor({ interior: interior, count: nCells }, blockMass, payload);
+    var burners = fm.burners, lift = fm.lift, mass = fm.mass;
     return {
       positions: positions, types: types, steps: steps, count: nCells,
       interior: interior, solid: solid, solidPositions: solidPositions,
@@ -1356,6 +1306,17 @@
     return 1;
   }
 
+  /* schematic blocks + palette → weighted cell-center entries for the COM math */
+  function massEntries(blocks, palette) {
+    var entries = [];
+    for (var i = 0; i < blocks.length; i++) {
+      var b = blocks[i];
+      var nm = palette[b.state] ? palette[b.state].name : 'minecraft:stone';
+      entries.push({ x: b.x + 0.5, y: b.y + 0.5, z: b.z + 0.5, m: massOf(nm) });
+    }
+    return entries;
+  }
+
   /* weighted center of mass of [{x,y,z,m}] entries (cell-center coords) */
   function comFor(entries) {
     var sx = 0, sy = 0, sz = 0, m = 0;
@@ -1372,22 +1333,19 @@
   function blocksToResult(audit) {
     var n = audit.blocks.length;
     var positions = new Int16Array(n * 3), types = new Uint8Array(n);
-    var minX = 1e9, minY = 1e9, minZ = 1e9, maxX = -1e9, maxY = -1e9, maxZ = -1e9;
     for (var i = 0; i < n; i++) {
       var b = audit.blocks[i];
       positions[i * 3] = b.x;
       positions[i * 3 + 1] = b.y;
       positions[i * 3 + 2] = b.z;
       types[i] = Math.min(255, 100 + b.state);
-      if (b.x < minX) minX = b.x; if (b.x > maxX) maxX = b.x;
-      if (b.y < minY) minY = b.y; if (b.y > maxY) maxY = b.y;
-      if (b.z < minZ) minZ = b.z; if (b.z > maxZ) maxZ = b.z;
     }
+    var bb = boundsOfTriples(positions, n);
     return {
       positions: positions, types: types, count: n,
       interior: 0, solid: n, solidPositions: null,
       wool: 0, logs: 0, planks: 0,
-      minX: minX, minY: minY, minZ: minZ, maxX: maxX, maxY: maxY, maxZ: maxZ,
+      minX: bb.minX, minY: bb.minY, minZ: bb.minZ, maxX: bb.maxX, maxY: bb.maxY, maxZ: bb.maxZ,
       hollow: false, fromSchematic: true
     };
   }
@@ -1462,12 +1420,7 @@
        (what the overlay shows — and what the ship position sliders trim). */
   function comCheck(crystal, audit, shipX, shipZ) {
     shipX = +shipX || 0; shipZ = +shipZ || 0;
-    var entries = [];
-    for (var b = 0; b < audit.blocks.length; b++) {
-      var blk = audit.blocks[b];
-      var nm = audit.palette[blk.state] ? audit.palette[blk.state].name : 'minecraft:stone';
-      entries.push({ x: blk.x + 0.5, y: blk.y + 0.5, z: blk.z + 0.5, m: massOf(nm) });
-    }
+    var entries = massEntries(audit.blocks, audit.palette);
     var shipCom = comFor(entries);
     var shipCenter = audit.center;
     if (!shipCenter) {
@@ -1478,13 +1431,9 @@
         if (b1.y < mny) mny = b1.y; if (b1.y > mxy) mxy = b1.y;
         if (b1.z < mnz) mnz = b1.z; if (b1.z > mxz) mxz = b1.z;
       }
-      shipCenter = { x: (mnx + mxx + 1) / 2, y: (mny + mxy + 1) / 2, z: (mnz + mxz + 1) / 2 };
+      shipCenter = middleOf(mnx, mny, mnz, mxx, mxy, mxz);
     }
-    var crystalCenter = {
-      x: (crystal.minX + crystal.maxX + 1) / 2,
-      y: (crystal.minY + crystal.maxY + 1) / 2,
-      z: (crystal.minZ + crystal.maxZ + 1) / 2
-    };
+    var crystalCenter = middleOf(crystal.minX, crystal.minY, crystal.minZ, crystal.maxX, crystal.maxY, crystal.maxZ);
     var cEntries = [];
     for (var i = 0; i < crystal.count; i++) {
       cEntries.push({
@@ -1797,14 +1746,9 @@
       var pl = clamp(+opts.payload || 0, 0, 1000000);
       /* center of mass (weighted by the Create-style mass table) vs the
          middle of the occupied bounding box */
-      var entries = [];
-      for (var c2 = 0; c2 < blocks.length; c2++) {
-        var bb = blocks[c2];
-        var nmc = palette[bb.state] ? palette[bb.state].name : 'minecraft:stone';
-        entries.push({ x: bb.x + 0.5, y: bb.y + 0.5, z: bb.z + 0.5, m: massOf(nmc) });
-      }
+      var entries = massEntries(blocks, palette);
       var com = comFor(entries);
-      var center = { x: (minX + maxX + 1) / 2, y: (minY + maxY + 1) / 2, z: (minZ + maxZ + 1) / 2 };
+      var center = middleOf(minX, minY, minZ, maxX, maxY, maxZ);
       var comOffset = { x: com.x - center.x, y: com.y - center.y, z: com.z - center.z };
       var comBalanced = Math.abs(comOffset.x) <= 1 && Math.abs(comOffset.y) <= 1 && Math.abs(comOffset.z) <= 1;
       return {

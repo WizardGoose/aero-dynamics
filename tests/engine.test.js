@@ -77,6 +77,47 @@ test('balloon: min/max bounds cover every emitted block', () => {
   }
 });
 
+test('balloon: ribs, keel and fins add their typed structure monotonically', () => {
+  const p = { lengthX: 20, widthZ: 16, heightY: 18, hollow: true, shell: 1 };
+  const plain = Gen.genBalloon(p);
+  const ribs = Gen.genBalloon(Object.assign({}, p, { ribEnabled: true, ribSpacing: 4 }));
+  const keel = Gen.genBalloon(Object.assign({}, p, { keelEnabled: true, keelDepth: 3 }));
+  const keelDeep = Gen.genBalloon(Object.assign({}, p, { keelEnabled: true, keelDepth: 5 }));
+  const tail = Gen.genBalloon(Object.assign({}, p, { finEnabled: true, finHeight: 4, finLength: 5 }));
+  const sides = Gen.genBalloon(Object.assign({}, p, { sideFinEnabled: true, finHeight: 4, finLength: 5 }));
+  assert.ok(ribs.count > plain.count && ribs.logs > plain.logs);
+  assert.ok(keel.logs > 0 && keelDeep.logs >= keel.logs);
+  assert.ok(tail.planks > 0 && sides.planks > 0);
+  assert.ok(tail.count > plain.count && sides.count > plain.count);
+  assert.ok(tail.maxY > plain.maxY && sides.maxZ > plain.maxZ);
+});
+
+test('balloon and crystal: includeSolid emits the complete solid grid', () => {
+  const balloon = Gen.genBalloon({ lengthX: 12, widthZ: 10, heightY: 12, includeSolid: true });
+  assert.ok(balloon.solidPositions instanceof Int16Array);
+  assert.strictEqual(balloon.solidPositions.length, balloon.solid * 3);
+  const crystal = Gen.genCrystal({ heightY: 16, baseDiagX: 10, baseDiagZ: 8, jitter: 0,
+    crackCount: 0, inclusionCount: 0, includeSolid: true });
+  assert.ok(crystal.solidPositions instanceof Int16Array);
+  assert.strictEqual(crystal.solidPositions.length, crystal.solid * 3);
+});
+
+test('crystal: sealed pockets are filled before the hull is emitted', () => {
+  for (const p of [
+    { heightY: 40, baseDiagX: 29, baseDiagZ: 12, facets: 3, jitter: 0.368, twistDeg: 167,
+      leanX: 11.3, leanZ: 15.1, asym: 0.422, topCrop: 0.159, midBand: 0.292,
+      crackCount: 4, seed: 1, shell: 3 },
+    { heightY: 18, baseDiagX: 15, baseDiagZ: 6, facets: 6, jitter: 0.30546182034261177,
+      twistDeg: 0.7205840870216695, leanX: 5.43488629082022, leanZ: 7.8498056617283885,
+      asym: 0.2402527543975419, topCrop: 0.13492777068777384, midBand: 0.28874395021482563,
+      crackCount: 6, seed: 50, shell: 1 }
+  ]) {
+    const r = Gen.genCrystal(p);
+    assert.ok(r.pocketsFilled > 0, JSON.stringify(p));
+    assert.ok(r.solid > r.count);
+  }
+});
+
 /* ---------- propeller ---------- */
 test('prop: counts, blades, material and requirement math (propMath)', () => {
   const r = Gen.genProp({ blades: 4, length: 10, rootChord: 3, tipChord: 1, swept: true, bladeMaterial: 'wool' });
@@ -533,6 +574,12 @@ test('shapes: torus ring fits its box; big grids are capped', () => {
   assert.ok(big.count + big.interior <= 24000000 + 1);
 });
 
+test('shapes: oversized dimensions are downscaled before allocation', () => {
+  const r = Gen.genShapes({ kind: 'sphere', sizeX: 200, sizeY: 200, sizeZ: 200 });
+  assert.ok(r.solid < 200 * 200 * 200);
+  assert.ok(r.count + r.interior <= 24000000 + 1);
+});
+
 /* ---------- dispatch ---------- */
 test('dispatch: known kinds route, removed kinds fall back to balloon', () => {
   assert.strictEqual(Gen.gen('crystal', {}).facets, 4);
@@ -633,6 +680,106 @@ test('schematic lab: legacy pre-1.20.2 list wrappers also parse', async () => {
   assert.strictEqual(r.total, 1);
   assert.strictEqual(r.palette[0].name, 'minecraft:stone');
   assert.strictEqual(r.dataVersion, 2860);
+});
+
+function nbtFixture(fields) {
+  const b = [];
+  const u8 = (v) => b.push(v & 0xff);
+  const i16 = (v) => b.push((v >> 8) & 0xff, v & 0xff);
+  const i32 = (v) => b.push((v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff);
+  const str = (s) => { const e = Buffer.from(s); i16(e.length); for (const c of e) u8(c); };
+  const name = (tag, n) => { u8(tag); str(n); };
+  u8(10); i16(0);
+  fields({ u8, i16, i32, str, name, b });
+  u8(0);
+  return Uint8Array.from(b);
+}
+
+test('schematic lab: exercises scalar, array and list NBT payloads', () => {
+  const bytes = nbtFixture(({ u8, i16, i32, str, name, b }) => {
+    name(2, 'short'); i16(-12);
+    name(4, 'long'); const lv = Buffer.alloc(8); lv.writeBigInt64BE(1234567890123n); b.push(...lv);
+    name(5, 'float'); const fv = Buffer.alloc(4); fv.writeFloatBE(1.25); b.push(...fv);
+    name(6, 'double'); const dv = Buffer.alloc(8); dv.writeDoubleBE(Math.PI); b.push(...dv);
+    name(7, 'bytes'); i32(3); b.push(1, 2, 255);
+    name(9, 'ints'); u8(3); i32(2); i32(4); i32(-5);
+    name(9, 'legacy'); u8(10); i32(1); u8(10); i16(0);
+    name(1, 'flag'); u8(1); u8(0);
+    name(11, 'ia'); i32(2); i32(7); i32(-8);
+    name(12, 'la'); i32(2);
+    const a = Buffer.alloc(8); a.writeBigInt64BE(-2n); b.push(...a);
+    const c = Buffer.alloc(8); c.writeBigInt64BE(9n); b.push(...c);
+  });
+  const r = Gen.nbtRead(bytes);
+  assert.strictEqual(r.value.short.value, -12);
+  assert.strictEqual(r.value.long.value, 1234567890123n);
+  assert.strictEqual(r.value.float.value, 1.25);
+  assert.ok(Math.abs(r.value.double.value - Math.PI) < 1e-12);
+  assert.deepStrictEqual(Array.from(r.value.bytes.value), [1, 2, 255]);
+  assert.deepStrictEqual(r.value.ints.value, [4, -5]);
+  assert.strictEqual(r.value.legacy.value[0].flag.value, 1);
+  assert.deepStrictEqual(Array.from(r.value.ia.value), [7, -8]);
+  assert.deepStrictEqual(r.value.la.value, [-2n, 9n]);
+});
+
+test('schematic lab: inflate rejects when DecompressionStream is unavailable', async () => {
+  const previous = globalThis.DecompressionStream;
+  try {
+    globalThis.DecompressionStream = undefined;
+    await assert.rejects(Gen.inflateGz(new Uint8Array([1, 2, 3])), /no DecompressionStream/);
+  } finally {
+    globalThis.DecompressionStream = previous;
+  }
+});
+
+function buildLitematicFixture() {
+  const b = [];
+  const u8 = (v) => b.push(v & 0xff);
+  const i16 = (v) => b.push((v >> 8) & 0xff, v & 0xff);
+  const i32 = (v) => b.push((v >>> 24) & 0xff, (v >>> 16) & 0xff, (v >>> 8) & 0xff, v & 0xff);
+  const str = (s) => { const e = Buffer.from(s); i16(e.length); for (const c of e) u8(c); };
+  const name = (tag, n) => { u8(tag); str(n); };
+  const intField = (n, v) => { name(3, n); i32(v); };
+  const compound = (n, fn) => { name(10, n); fn(); u8(0); };
+  const list = (n, type, len, fn) => { name(9, n); u8(type); i32(len); fn(); };
+  u8(10); i16(0);
+  compound('Regions', () => compound('Main', () => {
+    compound('Size', () => { intField('x', 22); intField('y', 1); intField('z', 1); });
+    list('BlockStatePalette', 10, 5, () => {
+      for (const n of ['minecraft:stone', 'minecraft:air', 'aeronautics:adjustable_burner', 'minecraft:oak_planks', 'aeronautics:levitite']) {
+        name(8, 'Name'); str(n); u8(0);
+      }
+    });
+    name(12, 'BlockStates');
+    const bits = 3, values = new Array(22).fill(1);
+    values[0] = 0; values[1] = 2; values[2] = 3; values[3] = 4; values[21] = 4;
+    const words = [0n, 0n];
+    for (let i = 0; i < values.length; i++) {
+      const pos = i * bits, word = Math.floor(pos / 64), shift = pos % 64;
+      words[word] |= (BigInt(values[i]) << BigInt(shift)) & ((1n << 64n) - 1n);
+      if (shift + bits > 64) words[word + 1] |= BigInt(values[i]) >> BigInt(64 - shift);
+    }
+    i32(words.length);
+    for (const value of words) {
+      const raw = Buffer.alloc(8);
+      raw.writeBigInt64BE(value >= (1n << 63n) ? value - (1n << 64n) : value);
+      b.push(...raw);
+    }
+  }));
+  u8(0);
+  return Uint8Array.from(b);
+}
+
+test('schematic lab: parses Litematica packed states across a long boundary', async () => {
+  const r = await Gen.analyzeSchematic(buildLitematicFixture());
+  assert.strictEqual(r.ok, true, JSON.stringify(r));
+  assert.strictEqual(r.total, 5);
+  assert.deepStrictEqual(r.size, { x: 22, y: 1, z: 1 });
+  assert.strictEqual(r.aero.burner, 1);
+  assert.strictEqual(r.aero.levitite, 2);
+  assert.strictEqual(r.namespaces.minecraft, 2);
+  assert.strictEqual(r.palette[0].count, 2);
+  assert.ok(r.blocks.some((block) => block.x === 21 && block.state === 4));
 });
 
 /* ---------- balance checker ---------- */

@@ -30,7 +30,7 @@ jobs:
       - name: Compile the site
         run: npm run build
       - name: Test
-        run: npm test
+        run: node --test --test-concurrency=1 tests/*.test.js
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
